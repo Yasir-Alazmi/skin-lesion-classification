@@ -9,6 +9,22 @@
 [![CI](https://github.com/Yasir-Alazmi/skin-lesion-classification/actions/workflows/ci.yml/badge.svg)](https://github.com/Yasir-Alazmi/skin-lesion-classification/actions/workflows/ci.yml)
 [![Accuracy](https://img.shields.io/badge/ViT--B%2F16%20Accuracy-94.2%25-brightgreen)](results/README.md)
 [![AUC](https://img.shields.io/badge/Macro%20AUC-0.96-blue)](results/README.md)
+[![Kaggle](https://img.shields.io/badge/Kaggle-Notebook-20BEFF?logo=kaggle&logoColor=white)](https://www.kaggle.com/code/yasirnalazmi/ham10000-dataset-efficientnet-vs-vision-transfo)
+
+---
+
+## 📓 Kaggle Notebook
+
+The full experiment — data loading, preprocessing, training, and evaluation — is available as a reproducible Kaggle Notebook:
+
+> **[HAM10000 Dataset: EfficientNet vs Vision Transformer](https://www.kaggle.com/code/yasirnalazmi/ham10000-dataset-efficientnet-vs-vision-transfo)**
+
+The notebook covers:
+- HAM10000 dataset exploration and class distribution analysis
+- Hair removal preprocessing pipeline (Black-Hat morphology + TELEA inpainting)
+- EfficientNet-B3 and ViT-B/16 training with Focal Loss and WeightedRandomSampler
+- Full evaluation: confusion matrices, ROC curves, per-class metrics
+- Side-by-side model comparison
 
 ---
 
