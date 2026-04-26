@@ -6,6 +6,9 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-orange)](https://pytorch.org)
 [![timm](https://img.shields.io/badge/timm-0.9.12-green)](https://github.com/huggingface/pytorch-image-models)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/Yasir-Alazmi/skin-lesion-classification/actions/workflows/ci.yml/badge.svg)](https://github.com/Yasir-Alazmi/skin-lesion-classification/actions/workflows/ci.yml)
+[![Accuracy](https://img.shields.io/badge/ViT--B%2F16%20Accuracy-94.2%25-brightgreen)](results/README.md)
+[![AUC](https://img.shields.io/badge/Macro%20AUC-0.96-blue)](results/README.md)
 
 ---
 
@@ -17,7 +20,24 @@
 | EfficientNet-B3 | 92.6% | 91.9% | 0.95 |
 | **ViT-B/16** | **94.2%** | **93.8%** | **0.96** |
 
-> Best checkpoint: `models/checkpoints/best_vit_b16.pth`
+> Best checkpoint: `models/checkpoints/best_vit_b16.pth` — see [models/README.md](models/README.md) for download instructions.
+
+### Training History
+![Training History](results/training_history.png)
+
+### Model Comparison
+![Model Comparison](results/model_comparison.png)
+
+### Confusion Matrices
+![Confusion Matrices](results/confusion_matrices.png)
+
+### ROC Curves
+![ROC Curves](results/roc_curves.png)
+
+### Preprocessing — Hair Removal
+![Hair Removal Demo](results/hair_removal_demo.png)
+
+> 📂 All result files are documented in [`results/README.md`](results/README.md)
 
 ---
 
@@ -105,7 +125,7 @@ data/raw/
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/<your-username>/skin-lesion-classification.git
+git clone https://github.com/Yasir-Alazmi/skin-lesion-classification.git
 cd skin-lesion-classification
 
 # 2. Create and activate a virtual environment (recommended)
@@ -296,6 +316,18 @@ And the focal loss paper:
   year      = {2017}
 }
 ```
+
+---
+
+## Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to submit pull requests, report issues, and set up the development environment.
+
+---
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a full history of changes.
 
 ---
 
