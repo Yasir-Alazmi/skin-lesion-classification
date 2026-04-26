@@ -1,0 +1,1 @@
+{"repos": [{"repoId": "timm/efficientnet_b3.ra2_in1k", "repoType": "model", "commitHash": "0366a75518620e0f2077789202073759f2d61393", "filePaths": ["model.safetensors"]}, {"repoId": "timm/vit_base_patch16_224.augreg2_in21k_ft_in1k", "repoType": "model", "commitHash": "063c6c38a5d8510b2e57df480445e94b231dad2c", "filePaths": ["model.safetensors"]}]}
