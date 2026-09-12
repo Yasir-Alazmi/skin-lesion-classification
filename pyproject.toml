@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "EfficientNet-B3 vs ViT-B/16 benchmark on HAM10000 dermoscopic images"
 readme = "README.md"
 license = { file = "LICENSE" }
-authors = [{ name = "Yasir Alazmi", email = "" }]
+authors = [{ name = "Yasir Alazmi" }]
 requires-python = ">=3.10"
 dependencies = [
     "torch==2.1.0",
