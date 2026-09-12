@@ -3,12 +3,12 @@
 # Import the most commonly used symbols for convenience.
 
 from src.config import (
-    SEED,
+    CLASS_NAMES,
     DEVICE,
     IMG_SIZE,
-    NUM_CLASSES,
-    CLASS_NAMES,
     LABEL_MAP,
+    NUM_CLASSES,
+    SEED,
 )
 
 __all__ = [

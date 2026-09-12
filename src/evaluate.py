@@ -19,7 +19,6 @@ from __future__ import annotations
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
 from sklearn.metrics import (
     accuracy_score,
     confusion_matrix,
@@ -27,14 +26,15 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 from sklearn.preprocessing import label_binarize
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from src.config import DEVICE, NUM_CLASSES, CLASS_NAMES
-
+from src.config import CLASS_NAMES, DEVICE, NUM_CLASSES
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Core inference pass
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def evaluate(
     model: nn.Module,
@@ -67,28 +67,28 @@ def evaluate(
     all_logits: list[torch.Tensor] = []
     all_labels: list[torch.Tensor] = []
     running_loss = 0.0
-    total        = 0
+    total = 0
 
     with torch.no_grad():
         for images, labels in tqdm(loader, desc="Eval", leave=False):
-            images  = images.to(device, non_blocking=True)
-            labels  = labels.to(device, non_blocking=True)
+            images = images.to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
 
-            logits  = model(images)
-            loss    = criterion(logits, labels)
+            logits = model(images)
+            loss = criterion(logits, labels)
 
             running_loss += loss.item() * images.size(0)
-            total        += images.size(0)
+            total += images.size(0)
 
             all_logits.append(logits.cpu())
             all_labels.append(labels.cpu())
 
     # Concatenate
-    logits_cat = torch.cat(all_logits, dim=0)         # (N, C)
-    labels_cat = torch.cat(all_labels, dim=0).numpy() # (N,)
+    logits_cat = torch.cat(all_logits, dim=0)  # (N, C)
+    labels_cat = torch.cat(all_labels, dim=0).numpy()  # (N,)
 
     probs = torch.softmax(logits_cat, dim=-1).numpy()  # (N, C)
-    preds = logits_cat.argmax(dim=-1).numpy()           # (N,)
+    preds = logits_cat.argmax(dim=-1).numpy()  # (N,)
 
     avg_loss = running_loss / total
     accuracy = accuracy_score(labels_cat, preds)
@@ -98,18 +98,19 @@ def evaluate(
     auc = roc_auc_score(labels_bin, probs, multi_class="ovr", average="macro")
 
     return {
-        "loss":     avg_loss,
+        "loss": avg_loss,
         "accuracy": accuracy,
-        "auc":      auc,
-        "probs":    probs,
-        "preds":    preds,
-        "labels":   labels_cat,
+        "auc": auc,
+        "probs": probs,
+        "preds": preds,
+        "labels": labels_cat,
     }
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Full evaluation (per-class metrics + confusion matrix)
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def full_evaluation(
     model: nn.Module,
@@ -142,14 +143,14 @@ def full_evaluation(
         'class_names'      – list of str
     """
     base = evaluate(model, loader, criterion, device)
-    preds  = base["preds"]
+    preds = base["preds"]
     labels = base["labels"]
-    probs  = base["probs"]
+    probs = base["probs"]
 
     num_classes = len(class_names)
 
     # ── Macro F1 ──────────────────────────────────────────────────────────────
-    f1_macro    = f1_score(labels, preds, average="macro", zero_division=0)
+    f1_macro = f1_score(labels, preds, average="macro", zero_division=0)
     f1_per_class = f1_score(labels, preds, average=None, zero_division=0)
 
     # ── Confusion matrix ──────────────────────────────────────────────────────
@@ -161,9 +162,9 @@ def full_evaluation(
 
     for c in range(num_classes):
         tp = cm[c, c]
-        fn = cm[c, :].sum() - tp                 # actual positives missed
-        fp = cm[:, c].sum() - tp                 # false positives
-        tn = cm.sum() - tp - fn - fp             # true negatives
+        fn = cm[c, :].sum() - tp  # actual positives missed
+        fp = cm[:, c].sum() - tp  # false positives
+        tn = cm.sum() - tp - fn - fp  # true negatives
 
         sensitivity[c] = tp / (tp + fn) if (tp + fn) > 0 else 0.0
         specificity[c] = tn / (tn + fp) if (tn + fp) > 0 else 0.0
@@ -178,9 +179,9 @@ def full_evaluation(
             per_class_auc[c] = float("nan")
 
     # ── Summary table print ───────────────────────────────────────────────────
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print(f"{'Class':<22} {'AUC':>8} {'F1':>8} {'Sens':>8} {'Spec':>8}")
-    print("-"*70)
+    print("-" * 70)
     for i, name in enumerate(class_names):
         print(
             f"{name:<22} "
@@ -189,7 +190,7 @@ def full_evaluation(
             f"{sensitivity[i]:>8.4f} "
             f"{specificity[i]:>8.4f}"
         )
-    print("-"*70)
+    print("-" * 70)
     print(
         f"{'MACRO / OVERALL':<22} "
         f"{base['auc']:>8.4f} "
@@ -197,17 +198,17 @@ def full_evaluation(
         f"{sensitivity.mean():>8.4f} "
         f"{specificity.mean():>8.4f}"
     )
-    print("="*70)
+    print("=" * 70)
     print(f"Overall Accuracy : {base['accuracy']:.4f}")
     print(f"Overall Loss     : {base['loss']:.4f}")
 
     return {
         **base,
-        "f1_macro":        f1_macro,
-        "f1_per_class":    f1_per_class,
-        "sensitivity":     sensitivity,
-        "specificity":     specificity,
+        "f1_macro": f1_macro,
+        "f1_per_class": f1_per_class,
+        "sensitivity": sensitivity,
+        "specificity": specificity,
         "confusion_matrix": cm,
-        "per_class_auc":   per_class_auc,
-        "class_names":     class_names,
+        "per_class_auc": per_class_auc,
+        "class_names": class_names,
     }

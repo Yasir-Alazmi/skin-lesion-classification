@@ -18,10 +18,10 @@ Method. Journal of Graphics Tools, 9(1), 23-34.
 
 from __future__ import annotations
 
-import os
+from pathlib import Path
+
 import cv2
 import numpy as np
-from pathlib import Path
 
 
 def remove_hair(
@@ -62,16 +62,12 @@ def remove_hair(
     # ── 2. Black-Hat transform ────────────────────────────────────────────────
     # Black-Hat = closing(I) - I  →  highlights dark objects smaller than
     # the structuring element (i.e. hair strands) against a bright background.
-    kernel = cv2.getStructuringElement(
-        cv2.MORPH_RECT, (kernel_size, kernel_size)
-    )
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
     blackhat = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel)
 
     # ── 3. Binary threshold → inpainting mask ────────────────────────────────
     # Pixels above `threshold` in the Black-Hat image are treated as hair.
-    _, mask = cv2.threshold(
-        blackhat, threshold, 255, cv2.THRESH_BINARY
-    )
+    _, mask = cv2.threshold(blackhat, threshold, 255, cv2.THRESH_BINARY)
 
     # ── 4. TELEA inpainting ───────────────────────────────────────────────────
     # Reconstruct masked pixels from surrounding neighbourhood context.

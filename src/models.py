@@ -22,10 +22,10 @@ import timm
 import torch
 import torch.nn as nn
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # EfficientNet-B3
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class EfficientNetB3Classifier(nn.Module):
     """
@@ -56,8 +56,8 @@ class EfficientNetB3Classifier(nn.Module):
         self.backbone = timm.create_model(
             "efficientnet_b3",
             pretrained=pretrained,
-            num_classes=0,       # Remove head → output is feature vector
-            global_pool="avg",   # Global average pooling
+            num_classes=0,  # Remove head → output is feature vector
+            global_pool="avg",  # Global average pooling
         )
 
         in_features = self.backbone.num_features  # 1536 for EfficientNet-B3
@@ -73,8 +73,8 @@ class EfficientNetB3Classifier(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        features = self.backbone(x)   # (N, 1536)
-        logits   = self.head(features) # (N, num_classes)
+        features = self.backbone(x)  # (N, 1536)
+        logits = self.head(features)  # (N, num_classes)
         return logits
 
     def freeze_backbone(self) -> None:
@@ -114,6 +114,7 @@ def build_efficientnet(
 # Vision Transformer — ViT-B/16
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class ViTB16Classifier(nn.Module):
     """
     ViT-B/16 backbone with a custom classification head.
@@ -143,7 +144,7 @@ class ViTB16Classifier(nn.Module):
         self.backbone = timm.create_model(
             "vit_base_patch16_224",
             pretrained=pretrained,
-            num_classes=0,    # Remove original head
+            num_classes=0,  # Remove original head
         )
 
         in_features = self.backbone.num_features  # 768 for ViT-B/16
@@ -159,8 +160,8 @@ class ViTB16Classifier(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        features = self.backbone(x)    # (N, 768) — CLS token output
-        logits   = self.head(features) # (N, num_classes)
+        features = self.backbone(x)  # (N, 768) — CLS token output
+        logits = self.head(features)  # (N, num_classes)
         return logits
 
     def freeze_backbone(self) -> None:
@@ -201,9 +202,10 @@ def build_vit(
 # Utility
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def count_parameters(model: nn.Module) -> dict[str, int]:
     """Return total and trainable parameter counts for a model."""
-    total     = sum(p.numel() for p in model.parameters())
+    total = sum(p.numel() for p in model.parameters())
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     return {"total": total, "trainable": trainable}
 

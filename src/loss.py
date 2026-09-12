@@ -27,10 +27,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import WeightedRandomSampler
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Focal Loss
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class FocalLoss(nn.Module):
     """
@@ -82,19 +82,19 @@ class FocalLoss(nn.Module):
             Focal loss scalar (if reduction != 'none') or per-sample vector.
         """
         # Standard cross-entropy with log-softmax for numerical stability
-        log_probs = F.log_softmax(logits, dim=-1)           # (N, C)
-        probs     = torch.exp(log_probs)                    # (N, C)
+        log_probs = F.log_softmax(logits, dim=-1)  # (N, C)
+        probs = torch.exp(log_probs)  # (N, C)
 
         # Gather the log-probability and probability of the true class
         log_p_t = log_probs.gather(1, targets.unsqueeze(1)).squeeze(1)  # (N,)
-        p_t     = probs.gather(1, targets.unsqueeze(1)).squeeze(1)       # (N,)
+        p_t = probs.gather(1, targets.unsqueeze(1)).squeeze(1)  # (N,)
 
         # Focal weight: (1 - p_t)^gamma
         focal_weight = (1.0 - p_t).pow(self.gamma)
 
         # Apply optional per-class α weighting
         if self.alpha is not None:
-            alpha_t      = self.alpha[targets]
+            alpha_t = self.alpha[targets]
             focal_weight = alpha_t * focal_weight
 
         # Element-wise focal loss
@@ -151,6 +151,7 @@ def build_focal_loss(
 # Weighted sampler
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def make_weighted_sampler(labels: list[int]) -> WeightedRandomSampler:
     """
     Create a ``WeightedRandomSampler`` that assigns each sample a weight
@@ -171,7 +172,7 @@ def make_weighted_sampler(labels: list[int]) -> WeightedRandomSampler:
         Suitable for passing directly to a ``DataLoader`` as ``sampler=``.
     """
     labels_array = np.array(labels)
-    class_counts  = np.bincount(labels_array)
+    class_counts = np.bincount(labels_array)
 
     # Weight per class: inverse of frequency
     class_weights = 1.0 / class_counts.astype(np.float64)

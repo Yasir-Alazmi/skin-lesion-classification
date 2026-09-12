@@ -22,35 +22,34 @@ build_loaders(df, seed, batch_size, num_workers, apply_hair_removal)
 from __future__ import annotations
 
 import os
-import cv2
-import numpy as np
-import pandas as pd
 from pathlib import Path
-from PIL import Image
 from typing import Optional
-from sklearn.model_selection import train_test_split
 
+import cv2
+import pandas as pd
 import torch
-from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 import torchvision.transforms as T
+from PIL import Image
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader, Dataset
 
 from src.config import (
-    IMG_SIZE,
-    IMAGENET_MEAN,
-    IMAGENET_STD,
-    TRAIN_RATIO,
-    VAL_RATIO,
-    SEED,
-    LABEL_MAP,
     HAM_IMAGES_DIR_1,
     HAM_IMAGES_DIR_2,
+    IMAGENET_MEAN,
+    IMAGENET_STD,
+    IMG_SIZE,
+    LABEL_MAP,
+    SEED,
+    TRAIN_RATIO,
+    VAL_RATIO,
 )
 from src.preprocess import remove_hair
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Transform pipelines
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def get_transforms(split: str = "train") -> T.Compose:
     """
@@ -72,31 +71,36 @@ def get_transforms(split: str = "train") -> T.Compose:
     normalize = T.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
 
     if split == "train":
-        return T.Compose([
-            T.Resize((IMG_SIZE, IMG_SIZE)),
-            T.RandomHorizontalFlip(p=0.5),
-            T.RandomVerticalFlip(p=0.5),
-            T.RandomRotation(degrees=30),
-            T.ColorJitter(
-                brightness=0.2,
-                contrast=0.2,
-                saturation=0.2,
-                hue=0.1,
-            ),
-            T.ToTensor(),
-            normalize,
-        ])
+        return T.Compose(
+            [
+                T.Resize((IMG_SIZE, IMG_SIZE)),
+                T.RandomHorizontalFlip(p=0.5),
+                T.RandomVerticalFlip(p=0.5),
+                T.RandomRotation(degrees=30),
+                T.ColorJitter(
+                    brightness=0.2,
+                    contrast=0.2,
+                    saturation=0.2,
+                    hue=0.1,
+                ),
+                T.ToTensor(),
+                normalize,
+            ]
+        )
     else:  # val / test
-        return T.Compose([
-            T.Resize((IMG_SIZE, IMG_SIZE)),
-            T.ToTensor(),
-            normalize,
-        ])
+        return T.Compose(
+            [
+                T.Resize((IMG_SIZE, IMG_SIZE)),
+                T.ToTensor(),
+                normalize,
+            ]
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Dataset class
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class HAMDataset(Dataset):
     """
@@ -154,9 +158,7 @@ class HAMDataset(Dataset):
                 self._path_cache[image_id] = candidate
                 return candidate
 
-        raise FileNotFoundError(
-            f"Image '{image_id}.jpg' not found in: {self.image_dirs}"
-        )
+        raise FileNotFoundError(f"Image '{image_id}.jpg' not found in: {self.image_dirs}")
 
     # ── Dataset interface ─────────────────────────────────────────────────────
 
@@ -194,6 +196,7 @@ class HAMDataset(Dataset):
 # ──────────────────────────────────────────────────────────────────────────────
 # Data-splitting utilities
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def get_splits(
     df: pd.DataFrame,
@@ -248,6 +251,7 @@ TEST_RATIO = 1.0 - TRAIN_RATIO - VAL_RATIO
 # ──────────────────────────────────────────────────────────────────────────────
 # DataLoader factory
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def build_loaders(
     df: pd.DataFrame,

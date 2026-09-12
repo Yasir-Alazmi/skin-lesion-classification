@@ -30,23 +30,22 @@ show_predictions(model, dataset, class_names, device, n)
 
 from __future__ import annotations
 
-import os
-import math
 import itertools
-import numpy as np
+import math
+import os
+
 import matplotlib
-matplotlib.use("Agg")          # non-interactive backend (safe on headless servers)
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import seaborn as sns
+import numpy as np
 
-from sklearn.metrics import roc_curve, auc
-from sklearn.preprocessing import label_binarize
+matplotlib.use("Agg")  # non-interactive backend (safe on headless servers)
+import matplotlib.pyplot as plt  # noqa: E402
+import seaborn as sns  # noqa: E402
+import torch  # noqa: E402
+from sklearn.metrics import auc, roc_curve  # noqa: E402
+from sklearn.preprocessing import label_binarize  # noqa: E402
+from torch.utils.data import Dataset  # noqa: E402
 
-import torch
-from torch.utils.data import Dataset
-
-from src.config import OUTPUTS_DIR, NUM_CLASSES, CLASS_NAMES
+from src.config import CLASS_NAMES, OUTPUTS_DIR  # noqa: E402
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -54,10 +53,11 @@ from src.config import OUTPUTS_DIR, NUM_CLASSES, CLASS_NAMES
 
 _PALETTE = {
     "efficientnet": "#4C72B0",
-    "vit":          "#DD8452",
-    "correct":      "#2ECC71",
-    "wrong":        "#E74C3C",
+    "vit": "#DD8452",
+    "correct": "#2ECC71",
+    "wrong": "#E74C3C",
 }
+
 
 def _save(fig: plt.Figure, filename: str) -> str:
     """Save a figure to OUTPUTS_DIR and return the full path."""
@@ -76,6 +76,7 @@ def _style() -> None:
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. Training history
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def plot_training_history(
     eff_hist: dict[str, list[float]],
@@ -103,22 +104,25 @@ def plot_training_history(
     fig.suptitle("Training History — EfficientNet-B3 vs ViT-B/16", fontsize=14, fontweight="bold")
 
     metrics = [
-        ("loss",    "Loss",     "train_loss", "val_loss"),
-        ("acc",     "Accuracy", "train_acc",  "val_acc"),
-        ("auc",     "Val AUC",  None,         "val_auc"),
+        ("loss", "Loss", "train_loss", "val_loss"),
+        ("acc", "Accuracy", "train_acc", "val_acc"),
+        ("auc", "Val AUC", None, "val_auc"),
     ]
 
     for ax, (_, ylabel, train_key, val_key) in zip(axes, metrics):
         for hist, label, color in [
             (eff_hist, "EfficientNet-B3", _PALETTE["efficientnet"]),
-            (vit_hist, "ViT-B/16",        _PALETTE["vit"]),
+            (vit_hist, "ViT-B/16", _PALETTE["vit"]),
         ]:
             epochs = range(1, len(hist[val_key]) + 1)
             ax.plot(epochs, hist[val_key], color=color, label=f"{label} val", linewidth=2)
             if train_key and train_key in hist:
                 ax.plot(
-                    epochs, hist[train_key],
-                    color=color, linestyle="--", alpha=0.55,
+                    epochs,
+                    hist[train_key],
+                    color=color,
+                    linestyle="--",
+                    alpha=0.55,
                     label=f"{label} train",
                 )
         ax.set_xlabel("Epoch")
@@ -135,6 +139,7 @@ def plot_training_history(
 # ──────────────────────────────────────────────────────────────────────────────
 # 2. Confusion matrix
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def plot_confusion_matrix(
     cm: np.ndarray,
@@ -178,10 +183,13 @@ def plot_confusion_matrix(
     for i in range(len(class_names)):
         for j in range(len(class_names)):
             ax.text(
-                j + 0.5, i + 0.72,
+                j + 0.5,
+                i + 0.72,
                 f"({cm[i, j]})",
-                ha="center", va="center",
-                fontsize=7, color="grey",
+                ha="center",
+                va="center",
+                fontsize=7,
+                color="grey",
             )
 
     ax.set_xlabel("Predicted Label", fontsize=12)
@@ -199,6 +207,7 @@ def plot_confusion_matrix(
 # ──────────────────────────────────────────────────────────────────────────────
 # 3. ROC curves
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def plot_roc_curves(
     results: dict,
@@ -222,9 +231,9 @@ def plot_roc_curves(
     matplotlib.figure.Figure
     """
     _style()
-    probs  = results["probs"]   # (N, C)
+    probs = results["probs"]  # (N, C)
     labels = results["labels"]  # (N,)
-    n_cls  = len(class_names)
+    n_cls = len(class_names)
 
     labels_bin = label_binarize(labels, classes=list(range(n_cls)))
 
@@ -247,15 +256,19 @@ def plot_roc_curves(
 
     for c in range(n_cls):
         ax.plot(
-            fpr_dict[c], tpr_dict[c],
+            fpr_dict[c],
+            tpr_dict[c],
             color=cmap(c),
             lw=1.5,
             label=f"{class_names[c]} (AUC={roc_auc_dict[c]:.3f})",
         )
 
     ax.plot(
-        all_fpr, mean_tpr,
-        color="black", lw=2.5, linestyle="--",
+        all_fpr,
+        mean_tpr,
+        color="black",
+        lw=2.5,
+        linestyle="--",
         label=f"Macro Avg (AUC={macro_auc:.3f})",
     )
     ax.plot([0, 1], [0, 1], "k:", lw=1, label="Random")
@@ -276,6 +289,7 @@ def plot_roc_curves(
 # ──────────────────────────────────────────────────────────────────────────────
 # 4. Sensitivity / Specificity bar chart
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def plot_sens_spec(
     results: dict,
@@ -303,14 +317,28 @@ def plot_sens_spec(
     specificity = results["specificity"]
     n_cls = len(class_names)
 
-    x     = np.arange(n_cls)
+    x = np.arange(n_cls)
     width = 0.35
 
     fig, ax = plt.subplots(figsize=(12, 5))
-    bars1 = ax.bar(x - width / 2, sensitivity, width, label="Sensitivity (TPR)",
-                   color="#3498DB", alpha=0.85, edgecolor="white")
-    bars2 = ax.bar(x + width / 2, specificity, width, label="Specificity (TNR)",
-                   color="#E67E22", alpha=0.85, edgecolor="white")
+    bars1 = ax.bar(
+        x - width / 2,
+        sensitivity,
+        width,
+        label="Sensitivity (TPR)",
+        color="#3498DB",
+        alpha=0.85,
+        edgecolor="white",
+    )
+    bars2 = ax.bar(
+        x + width / 2,
+        specificity,
+        width,
+        label="Specificity (TNR)",
+        color="#E67E22",
+        alpha=0.85,
+        edgecolor="white",
+    )
 
     # Annotate bars
     for bar in itertools.chain(bars1, bars2):
@@ -318,15 +346,18 @@ def plot_sens_spec(
             bar.get_x() + bar.get_width() / 2,
             bar.get_height() + 0.01,
             f"{bar.get_height():.2f}",
-            ha="center", va="bottom", fontsize=8,
+            ha="center",
+            va="bottom",
+            fontsize=8,
         )
 
     ax.set_xticks(x)
     ax.set_xticklabels(class_names, rotation=30, ha="right")
     ax.set_ylabel("Score")
     ax.set_ylim(0, 1.15)
-    ax.set_title(f"Per-Class Sensitivity & Specificity — {model_name}",
-                 fontsize=13, fontweight="bold")
+    ax.set_title(
+        f"Per-Class Sensitivity & Specificity — {model_name}", fontsize=13, fontweight="bold"
+    )
     ax.legend()
     plt.tight_layout()
 
@@ -338,6 +369,7 @@ def plot_sens_spec(
 # ──────────────────────────────────────────────────────────────────────────────
 # 5. Model comparison (grouped bar)
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def plot_model_comparison(
     eff_results: dict,
@@ -360,8 +392,7 @@ def plot_model_comparison(
     matplotlib.figure.Figure
     """
     _style()
-    metric_labels = ["Accuracy", "Macro F1", "Macro AUC",
-                     "Mean Sens.", "Mean Spec."]
+    metric_labels = ["Accuracy", "Macro F1", "Macro AUC", "Mean Sens.", "Mean Spec."]
     eff_vals = [
         eff_results["accuracy"],
         eff_results["f1_macro"],
@@ -377,31 +408,45 @@ def plot_model_comparison(
         vit_results["specificity"].mean(),
     ]
 
-    x     = np.arange(len(metric_labels))
+    x = np.arange(len(metric_labels))
     width = 0.35
 
     fig, ax = plt.subplots(figsize=(11, 5))
-    bars1 = ax.bar(x - width / 2, eff_vals, width,
-                   label="EfficientNet-B3", color=_PALETTE["efficientnet"],
-                   alpha=0.85, edgecolor="white")
-    bars2 = ax.bar(x + width / 2, vit_vals, width,
-                   label="ViT-B/16", color=_PALETTE["vit"],
-                   alpha=0.85, edgecolor="white")
+    bars1 = ax.bar(
+        x - width / 2,
+        eff_vals,
+        width,
+        label="EfficientNet-B3",
+        color=_PALETTE["efficientnet"],
+        alpha=0.85,
+        edgecolor="white",
+    )
+    bars2 = ax.bar(
+        x + width / 2,
+        vit_vals,
+        width,
+        label="ViT-B/16",
+        color=_PALETTE["vit"],
+        alpha=0.85,
+        edgecolor="white",
+    )
 
     for bar in itertools.chain(bars1, bars2):
         ax.text(
             bar.get_x() + bar.get_width() / 2,
             bar.get_height() + 0.005,
             f"{bar.get_height():.3f}",
-            ha="center", va="bottom", fontsize=9, fontweight="bold",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+            fontweight="bold",
         )
 
     ax.set_xticks(x)
     ax.set_xticklabels(metric_labels)
     ax.set_ylim(0, 1.12)
     ax.set_ylabel("Score")
-    ax.set_title("Model Comparison — EfficientNet-B3 vs ViT-B/16",
-                 fontsize=13, fontweight="bold")
+    ax.set_title("Model Comparison — EfficientNet-B3 vs ViT-B/16", fontsize=13, fontweight="bold")
     ax.legend()
     plt.tight_layout()
 
@@ -413,6 +458,7 @@ def plot_model_comparison(
 # ──────────────────────────────────────────────────────────────────────────────
 # 6. Sample predictions grid
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def show_predictions(
     model: torch.nn.Module,
@@ -442,6 +488,7 @@ def show_predictions(
     matplotlib.figure.Figure
     """
     from src.config import DEVICE as _DEV
+
     if device is None:
         device = _DEV
 
@@ -458,7 +505,7 @@ def show_predictions(
 
     # ImageNet de-normalisation for display
     mean = np.array([0.485, 0.456, 0.406])
-    std  = np.array([0.229, 0.224, 0.225])
+    std = np.array([0.229, 0.224, 0.225])
 
     with torch.no_grad():
         for ax, idx in zip(axes, indices):
@@ -485,11 +532,12 @@ def show_predictions(
             ax.axis("off")
 
     # Hide any unused axes
-    for ax in axes[len(indices):]:
+    for ax in axes[len(indices) :]:
         ax.set_visible(False)
 
-    plt.suptitle("Sample Predictions (green=correct, red=wrong)",
-                 fontsize=12, fontweight="bold", y=1.01)
+    plt.suptitle(
+        "Sample Predictions (green=correct, red=wrong)", fontsize=12, fontweight="bold", y=1.01
+    )
     plt.tight_layout()
 
     if save:

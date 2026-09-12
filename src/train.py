@@ -29,7 +29,6 @@ from __future__ import annotations
 import copy
 import os
 import time
-from typing import Any
 
 import torch
 import torch.nn as nn
@@ -40,22 +39,22 @@ from tqdm import tqdm
 
 from src.config import (
     DEVICE,
+    EFFICIENTNET_CKPT,
     GRAD_CLIP,
     LR,
     LR_FACTOR,
     LR_MIN,
     LR_PATIENCE,
     UNFREEZE_EPOCH,
-    WEIGHT_DECAY,
-    EFFICIENTNET_CKPT,
     VIT_CKPT,
+    WEIGHT_DECAY,
 )
 from src.evaluate import evaluate
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Early Stopping
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class EarlyStopping:
     """
@@ -78,13 +77,13 @@ class EarlyStopping:
         min_delta: float = 1e-4,
         mode: str = "max",
     ) -> None:
-        self.patience  = patience
+        self.patience = patience
         self.min_delta = min_delta
-        self.mode      = mode
+        self.mode = mode
 
-        self.counter       = 0
-        self.best_value    = float("-inf") if mode == "max" else float("inf")
-        self.early_stop    = False
+        self.counter = 0
+        self.best_value = float("-inf") if mode == "max" else float("inf")
+        self.early_stop = False
 
     def __call__(self, value: float) -> bool:
         """
@@ -102,7 +101,7 @@ class EarlyStopping:
 
         if improved:
             self.best_value = value
-            self.counter    = 0
+            self.counter = 0
         else:
             self.counter += 1
             if self.counter >= self.patience:
@@ -112,14 +111,15 @@ class EarlyStopping:
 
     def reset(self) -> None:
         """Reset internal counter and best value."""
-        self.counter       = 0
-        self.best_value    = float("-inf") if self.mode == "max" else float("inf")
-        self.early_stop    = False
+        self.counter = 0
+        self.best_value = float("-inf") if self.mode == "max" else float("inf")
+        self.early_stop = False
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Single-epoch helpers
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def train_one_epoch(
     model: nn.Module,
@@ -148,9 +148,9 @@ def train_one_epoch(
     dict with keys 'loss' and 'accuracy'
     """
     model.train()
-    running_loss    = 0.0
-    correct         = 0
-    total           = 0
+    running_loss = 0.0
+    correct = 0
+    total = 0
 
     pbar = tqdm(loader, desc="Train", leave=False)
     for images, labels in pbar:
@@ -160,7 +160,7 @@ def train_one_epoch(
         optimizer.zero_grad(set_to_none=True)
 
         logits = model(images)
-        loss   = criterion(logits, labels)
+        loss = criterion(logits, labels)
         loss.backward()
 
         # Gradient clipping prevents exploding gradients (especially for ViT)
@@ -168,15 +168,15 @@ def train_one_epoch(
 
         optimizer.step()
 
-        bs            = images.size(0)
+        bs = images.size(0)
         running_loss += loss.item() * bs
-        correct      += (logits.argmax(dim=1) == labels).sum().item()
-        total        += bs
+        correct += (logits.argmax(dim=1) == labels).sum().item()
+        total += bs
 
         pbar.set_postfix(loss=f"{running_loss / total:.4f}")
 
     epoch_loss = running_loss / total
-    epoch_acc  = correct / total
+    epoch_acc = correct / total
     return {"loss": epoch_loss, "accuracy": epoch_acc}
 
 
@@ -195,15 +195,16 @@ def evaluate_epoch(
     """
     results = evaluate(model, loader, criterion, device)
     return {
-        "loss":     results["loss"],
+        "loss": results["loss"],
         "accuracy": results["accuracy"],
-        "auc":      results["auc"],
+        "auc": results["auc"],
     }
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Full training loop
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def train_model(
     model: nn.Module,
@@ -258,6 +259,7 @@ def train_model(
     # ── Setup ────────────────────────────────────────────────────────────────
     if criterion is None:
         from src.loss import FocalLoss
+
         criterion = FocalLoss(gamma=2.0).to(device)
 
     if checkpoint_path is None:
@@ -275,26 +277,26 @@ def train_model(
         lr=lr,
         weight_decay=weight_decay,
     )
-    scheduler   = ReduceLROnPlateau(
+    scheduler = ReduceLROnPlateau(
         optimizer,
-        mode="max",       # maximise val AUC
+        mode="max",  # maximise val AUC
         factor=LR_FACTOR,
         patience=LR_PATIENCE,
         min_lr=LR_MIN,
     )
-    early_stop  = EarlyStopping(patience=patience, min_delta=1e-4, mode="max")
+    early_stop = EarlyStopping(patience=patience, min_delta=1e-4, mode="max")
 
     history: dict[str, list[float]] = {
         "train_loss": [],
-        "train_acc":  [],
-        "val_loss":   [],
-        "val_acc":    [],
-        "val_auc":    [],
+        "train_acc": [],
+        "val_loss": [],
+        "val_acc": [],
+        "val_auc": [],
         "lr_history": [],
     }
 
-    best_val_auc   = float("-inf")
-    best_weights   = copy.deepcopy(model.state_dict())
+    best_val_auc = float("-inf")
+    best_weights = copy.deepcopy(model.state_dict())
     phase_switched = False
 
     print(f"\n{'='*60}")
@@ -312,14 +314,12 @@ def train_model(
             model.unfreeze_backbone()
 
             # Rebuild optimiser: backbone gets lr×0.1, head keeps lr
-            head_params     = list(model.head.parameters())
-            backbone_params = [
-                p for p in model.backbone.parameters() if p.requires_grad
-            ]
+            head_params = list(model.head.parameters())
+            backbone_params = [p for p in model.backbone.parameters() if p.requires_grad]
             optimizer = AdamW(
                 [
                     {"params": backbone_params, "lr": lr * 0.1},
-                    {"params": head_params,     "lr": lr},
+                    {"params": head_params, "lr": lr},
                 ],
                 weight_decay=weight_decay,
             )
@@ -334,9 +334,9 @@ def train_model(
 
         # ── Train one epoch ──────────────────────────────────────────────────
         train_metrics = train_one_epoch(model, train_loader, optimizer, criterion, device)
-        val_metrics   = evaluate_epoch(model, val_loader, criterion, device)
+        val_metrics = evaluate_epoch(model, val_loader, criterion, device)
 
-        val_auc  = val_metrics["auc"]
+        val_auc = val_metrics["auc"]
         scheduler.step(val_auc)
         current_lr = optimizer.param_groups[-1]["lr"]  # head LR
 
