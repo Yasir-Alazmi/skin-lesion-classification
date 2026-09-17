@@ -157,7 +157,23 @@ pip install -r requirements.txt
 
 > **CUDA:** The project was developed with CUDA 12.1 + cuDNN 8.9 on an NVIDIA RTX 3090.
 > Verify your CUDA version before installing PyTorch:
-> `python -c "import torch; print(torch.version.cuda)"`
+---
+
+## ⚡ Quickstart — 60-Second Zero-Friction Demo
+
+Run inference instantly on bundled sample dermoscopic images without downloading the full 2.6GB HAM10000 dataset:
+
+```bash
+# 1. Run CLI Inference on sample image (CPU, ~1.1s)
+python demo.py --image data/samples/sample_melanocytic_nevus.jpg --model vit
+
+# Or test EfficientNet-B3 (ultra-fast, ~230ms on CPU)
+python demo.py --image data/samples/sample_vascular_lesion.jpg --model efficientnet
+
+# 2. Launch Interactive Gradio Web UI
+pip install gradio
+python app.py
+```
 
 ---
 
