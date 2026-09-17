@@ -201,41 +201,60 @@ class HAMDataset(Dataset):
 def get_splits(
     df: pd.DataFrame,
     seed: int = SEED,
+    group_by_lesion: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Stratified 70 / 15 / 15 train / val / test split.
 
-    Stratification is on the ``dx`` column to preserve the class distribution
-    in every split, which is crucial for the highly imbalanced HAM10000 set.
+    When ``group_by_lesion=True`` and ``lesion_id`` is present in the DataFrame,
+    ``StratifiedGroupKFold`` is employed to prevent clinical data leakage:
+    all images belonging to the same patient/lesion remain strictly isolated within
+    either the training, validation, or testing fold.
 
     Parameters
     ----------
     df : pd.DataFrame
-        Full metadata DataFrame.  Must contain a ``dx`` column.
+        Full metadata DataFrame. Must contain a ``dx`` column.
     seed : int
         Random state for reproducibility.
+    group_by_lesion : bool, default=True
+        Whether to enforce lesion-level grouping to eliminate clinical data leakage.
 
     Returns
     -------
     (train_df, val_df, test_df) : tuple of pd.DataFrame
     """
-    # Step 1: separate out test set (15 %)
-    train_val_df, test_df = train_test_split(
-        df,
-        test_size=TEST_RATIO,
-        stratify=df["dx"],
-        random_state=seed,
-    )
+    if group_by_lesion and "lesion_id" in df.columns:
+        from sklearn.model_selection import StratifiedGroupKFold
 
-    # Step 2: split the remainder into train (70 %) / val (15 %)
-    # val_fraction = VAL_RATIO / (TRAIN_RATIO + VAL_RATIO) = 0.15 / 0.85 ≈ 0.176
-    val_fraction = VAL_RATIO / (TRAIN_RATIO + VAL_RATIO)
-    train_df, val_df = train_test_split(
-        train_val_df,
-        test_size=val_fraction,
-        stratify=train_val_df["dx"],
-        random_state=seed,
-    )
+        sgkf = StratifiedGroupKFold(n_splits=7, shuffle=True, random_state=seed)
+        splits = list(sgkf.split(df, df["dx"], groups=df["lesion_id"]))
+
+        # Fold 0 -> test (~14.3%), Fold 1 -> val (~14.3%), Folds 2..6 -> train (~71.4%)
+        _, test_idx = splits[0]
+        _, val_idx = splits[1]
+        train_idx = [i for i in range(len(df)) if i not in set(test_idx) and i not in set(val_idx)]
+
+        train_df = df.iloc[train_idx]
+        val_df = df.iloc[val_idx]
+        test_df = df.iloc[test_idx]
+    else:
+        # Step 1: separate out test set (15 %)
+        train_val_df, test_df = train_test_split(
+            df,
+            test_size=TEST_RATIO,
+            stratify=df["dx"],
+            random_state=seed,
+        )
+
+        # Step 2: split the remainder into train (70 %) / val (15 %)
+        val_fraction = VAL_RATIO / (TRAIN_RATIO + VAL_RATIO)
+        train_df, val_df = train_test_split(
+            train_val_df,
+            test_size=val_fraction,
+            stratify=train_val_df["dx"],
+            random_state=seed,
+        )
 
     return (
         train_df.reset_index(drop=True),

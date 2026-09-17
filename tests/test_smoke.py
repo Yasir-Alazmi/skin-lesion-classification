@@ -61,3 +61,30 @@ def test_model_output_shape_vit():
     with torch.no_grad():
         out = model(x)
     assert out.shape == (2, 7), f"Unexpected output shape: {out.shape}"
+
+
+def test_get_splits_stratified_group_leakage_isolation():
+    """Verify that multi-image lesions are never split across train and test sets."""
+    import pandas as pd
+    from src.dataset import get_splits
+
+    # Create synthetic metadata with duplicate lesion_ids (patient-level clustering)
+    records = []
+    classes = ["nv", "mel", "bkl", "bcc", "akiec", "vasc", "df"]
+    for i in range(140):
+        cls = classes[i % len(classes)]
+        lesion = f"LESION_{i // 2:03d}"  # 2 images per lesion
+        records.append({"image_id": f"IMG_{i:04d}", "lesion_id": lesion, "dx": cls})
+    df = pd.DataFrame(records)
+
+    train_df, val_df, test_df = get_splits(df, seed=42, group_by_lesion=True)
+
+    train_lesions = set(train_df["lesion_id"])
+    val_lesions = set(val_df["lesion_id"])
+    test_lesions = set(test_df["lesion_id"])
+
+    # Assert ZERO patient/lesion leakage across splits
+    assert train_lesions.isdisjoint(test_lesions), "Clinical data leakage detected between train and test!"
+    assert train_lesions.isdisjoint(val_lesions), "Clinical data leakage detected between train and val!"
+    assert val_lesions.isdisjoint(test_lesions), "Clinical data leakage detected between val and test!"
+
