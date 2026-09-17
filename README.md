@@ -116,6 +116,9 @@ EfficientNet-B3        ViT-B/16
 *The HAM10000 dataset, a large collection of multi-source dermatoscopic images of common pigmented skin lesions.*  
 Scientific Data **5**, 180161. DOI: [10.7910/DVN/DBW86T](https://doi.org/10.7910/DVN/DBW86T)
 
+> [!NOTE]
+> **Clinical Methodology & Data Leakage Isolation**: In dermoscopic datasets, HAM10000 contains multiple images for certain lesions. While baseline stratification splits on `dx` (diagnosis), clinical zero-leakage evaluation recommends `StratifiedGroupKFold` grouped by `lesion_id` to guarantee that multi-view images of the same patient/lesion remain strictly isolated within either training or testing folds.
+
 **Download:**
 ```bash
 # Option A — Kaggle CLI
