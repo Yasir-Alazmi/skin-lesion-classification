@@ -47,6 +47,12 @@ def run_inference(image_path: str, model_name: str = "vit", checkpoint_path: str
     t0 = time.perf_counter()
     img_bgr = cv2.imread(str(p))
     if img_bgr is None:
+        try:
+            pil_raw = Image.open(p).convert("RGB")
+            img_bgr = cv2.cvtColor(np.array(pil_raw), cv2.COLOR_RGB2BGR)
+        except Exception:
+            img_bgr = None
+    if img_bgr is None:
         print(f"Error: Could not decode image '{image_path}'")
         sys.exit(1)
 
@@ -57,11 +63,13 @@ def run_inference(image_path: str, model_name: str = "vit", checkpoint_path: str
     clean_rgb = cv2.cvtColor(clean_bgr, cv2.COLOR_BGR2RGB)
     pil_img = Image.fromarray(clean_rgb)
 
-    eval_transforms = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-    ])
+    eval_transforms = transforms.Compose(
+        [
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+        ]
+    )
     tensor = eval_transforms(pil_img).unsqueeze(0)
 
     # 3. Build Model
@@ -115,10 +123,25 @@ def run_inference(image_path: str, model_name: str = "vit", checkpoint_path: str
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Zero-Friction Inference CLI for Skin Lesion Classification")
-    parser.add_argument("--image", type=str, default="data/samples/sample_melanocytic_nevus.jpg", help="Path to input image")
-    parser.add_argument("--model", type=str, default="vit", choices=["vit", "efficientnet"], help="Model architecture")
-    parser.add_argument("--checkpoint", type=str, default=None, help="Optional path to model checkpoint (.pth)")
+    parser = argparse.ArgumentParser(
+        description="Zero-Friction Inference CLI for Skin Lesion Classification"
+    )
+    parser.add_argument(
+        "--image",
+        type=str,
+        default="data/samples/sample_melanocytic_nevus.jpg",
+        help="Path to input image",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="vit",
+        choices=["vit", "efficientnet"],
+        help="Model architecture",
+    )
+    parser.add_argument(
+        "--checkpoint", type=str, default=None, help="Optional path to model checkpoint (.pth)"
+    )
     args = parser.parse_args()
 
     run_inference(image_path=args.image, model_name=args.model, checkpoint_path=args.checkpoint)
