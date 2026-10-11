@@ -1,7 +1,19 @@
+---
+title: Tashkhees Skin Lesion Classification
+emoji: 🔬
+colorFrom: blue
+colorTo: indigo
+sdk: static
+pinned: true
+license: mit
+short_description: ViT-B/16 vs EfficientNet-B3 Dermoscopic Benchmark (HAM10000)
+---
+
 # Skin Lesion Classification — EfficientNet-B3 vs ViT-B/16
 
 > A PyTorch deep-learning benchmark comparing CNN and Vision Transformer architectures for 7-class dermoscopic image classification on the HAM10000 dataset.
 
+[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces%20Live%20Demo-blue)](https://huggingface.co/spaces/Yasir-Alazmi/tashkhees-skin-lesion)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://python.org)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-orange)](https://pytorch.org)
 [![timm](https://img.shields.io/badge/timm-0.9.12-green)](https://github.com/huggingface/pytorch-image-models)

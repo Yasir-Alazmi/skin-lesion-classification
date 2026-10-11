@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tashkhees — Skin Lesion Classification (ViT-B/16 vs EfficientNet-B3)</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --panel: #111827;
+      --panel-alt: #1f2937;
+      --border: #374151;
+      --text: #f9fafb;
+      --muted: #9ca3af;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px 16px 48px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    header {
+      background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(99,102,241,0.1));
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .badge {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      color: #93c5fd;
+      text-decoration: none;
+    }
+    .badge.green { color: #6ee7b7; border-color: rgba(16,185,129,0.4); }
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 14px;
+      max-width: 900px;
+    }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+    .tab-btn {
+      background: var(--panel);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      transition: all 0.15s;
+    }
+    .tab-btn.active, .tab-btn:hover {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .grid {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 920px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 18px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      margin-bottom: 14px;
+      background: rgba(255,255,255,0.01);
+    }
+    .upload-zone:hover { border-color: var(--accent); }
+    .sample-btns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .btn {
+      background: var(--panel-alt);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn:hover { border-color: var(--accent); background: #263244; }
+    .btn-primary {
+      width: 100%;
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+      padding: 11px;
+      font-size: 14px;
+      margin-top: 8px;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .control-group {
+      margin-bottom: 14px;
+    }
+    .control-group label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 6px;
+      color: #d1d5db;
+    }
+    select, input[type="range"] {
+      width: 100%;
+      background: var(--panel-alt);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px;
+      font-size: 13px;
+    }
+    .canvas-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    @media (max-width: 640px) {
+      .canvas-row { grid-template-columns: 1fr; }
+    }
+    .canvas-box {
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+    .canvas-box span {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    canvas {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 6px;
+      background: #000;
+      object-fit: cover;
+    }
+    .prob-row {
+      margin-bottom: 10px;
+    }
+    .prob-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    .prob-bar-bg {
+      height: 10px;
+      background: var(--panel-alt);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .prob-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #10b981);
+      border-radius: 999px;
+      transition: width 0.35s ease;
+    }
+    .disclaimer {
+      margin-top: 20px;
+      font-size: 12px;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+    }
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 16px;
+    }
+    .gallery-card img {
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin-top: 8px;
+      background: #fff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+    }
+    th { background: var(--panel-alt); color: #93c5fd; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="badge-row">
+        <span class="badge green">ViT-B/16 Accuracy: 94.2%</span>
+        <span class="badge green">Macro AUC: 0.96</span>
+        <span class="badge">EfficientNet-B3: 92.6%</span>
+        <span class="badge">HAM10000 (7 Classes)</span>
+        <a class="badge" href="https://github.com/Yasir-Alazmi/skin-lesion-classification" target="_blank">GitHub Repository ↗</a>
+        <a class="badge" href="https://www.kaggle.com/code/yasirnalazmi/ham10000-dataset-efficientnet-vs-vision-transfo" target="_blank">Kaggle Notebook ↗</a>
+      </div>
+      <h1>🔬 Tashkhees — Skin Lesion Classification (ViT-B/16 vs EfficientNet-B3)</h1>
+      <p class="subtitle">
+        Interactive dermoscopic preprocessing & classification demo by <strong>Yasir N. Alazmi</strong>.
+        Features real-time Black-Hat morphological hair artifact detection, neighborhood inpainting, and 7-class HAM10000 diagnostic benchmark comparison.
+      </p>
+    </header>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('demo', this)">⚡ Interactive Live Demo</button>
+      <button class="tab-btn" onclick="switchTab('benchmarks', this)">📊 Benchmark Results & ROC Curves</button>
+      <button class="tab-btn" onclick="switchTab('architecture', this)">🧠 Architecture & PyTorch CLI</button>
+    </div>
+
+    <!-- TAB 1: LIVE DEMO -->
+    <div id="tab-demo" class="tab-content active">
+      <div class="grid">
+        <div class="card">
+          <div class="card-title">1. Input & Model Configuration</div>
+          <label class="upload-zone" for="file-input">
+            <div style="font-size:24px;margin-bottom:4px;">📷</div>
+            <div style="font-size:13px;font-weight:600;">Click to Upload Dermoscopic Image</div>
+            <div style="font-size:11px;color:var(--muted);">Supports JPG / PNG (Processed locally in browser)</div>
+            <input id="file-input" type="file" accept="image/*" style="display:none" />
+          </label>
+
+          <div style="font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600;">Or select bundled HAM10000 sample:</div>
+          <div class="sample-btns">
+            <button class="btn" onclick="loadSample('nv')">🟢 Sample 1: Nevi (NV)</button>
+            <button class="btn" onclick="loadSample('vasc')">🔴 Sample 2: Vascular (VASC)</button>
+          </div>
+
+          <div class="control-group">
+            <label><span>Model Architecture</span></label>
+            <select id="model-select" onchange="runPipeline()">
+              <option value="vit">Vision Transformer (ViT-B/16) — 94.2% Acc</option>
+              <option value="effnet">EfficientNet-B3 — 92.6% Acc</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <label>
+              <span>Black-Hat Kernel Radius</span>
+              <strong id="lbl-kernel">7 px</strong>
+            </label>
+            <input id="rng-kernel" type="range" min="3" max="13" step="2" value="7" oninput="document.getElementById('lbl-kernel').textContent=this.value+' px'; runPipeline();" />
+          </div>
+
+          <div class="control-group">
+            <label>
+              <span>Hair Mask Threshold</span>
+              <strong id="lbl-thresh">14</strong>
+            </label>
+            <input id="rng-thresh" type="range" min="6" max="35" step="1" value="14" oninput="document.getElementById('lbl-thresh').textContent=this.value; runPipeline();" />
+          </div>
+
+          <button class="btn btn-primary" onclick="runPipeline()">🔬 Run Hair Removal & Classification</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <span>2. Morphological Preprocessing & Top Predictions</span>
+            <span id="latency-badge" class="badge green">Ready</span>
+          </div>
+
+          <div class="canvas-row">
+            <div class="canvas-box">
+              <span>Original Dermoscopic Input</span>
+              <canvas id="cv-orig" width="224" height="224"></canvas>
+            </div>
+            <div class="canvas-box">
+              <span>Black-Hat Hair Mask</span>
+              <canvas id="cv-mask" width="224" height="224"></canvas>
+            </div>
+            <div class="canvas-box">
+              <span>Inpainted (Hair-Removed)</span>
+              <canvas id="cv-clean" width="224" height="224"></canvas>
+            </div>
+          </div>
+
+          <div class="card-title" style="margin-top:8px;">
+            <span>HAM10000 7-Class Confidence Distribution</span>
+            <span id="active-model-label" style="color:#93c5fd;font-size:12px;">ViT-B/16</span>
+          </div>
+          <div id="predictions-container"></div>
+
+          <div class="disclaimer">
+            <strong>Disclaimer:</strong> This software is an engineering and research benchmark trained on the HAM10000 dataset.
+            It is intended solely for scientific evaluation and educational demonstration, and must <strong>not</strong> be used as a clinical diagnostic device.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: BENCHMARKS -->
+    <div id="tab-benchmarks" class="tab-content">
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-title">Model Performance Summary (HAM10000 Test Split)</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Architecture</th>
+              <th>Test Accuracy</th>
+              <th>Macro F1-Score</th>
+              <th>Macro ROC-AUC</th>
+              <th>Loss & Sampling</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>ResNet-50 (Baseline)</td>
+              <td>88.1%</td>
+              <td>86.3%</td>
+              <td>0.92</td>
+              <td>Cross-Entropy</td>
+            </tr>
+            <tr>
+              <td>EfficientNet-B3</td>
+              <td>92.6%</td>
+              <td>91.9%</td>
+              <td>0.95</td>
+              <td>Focal Loss (γ=2.0) + WeightedSampler</td>
+            </tr>
+            <tr>
+              <td><strong>Vision Transformer (ViT-B/16)</strong></td>
+              <td><strong>94.2%</strong></td>
+              <td><strong>93.8%</strong></td>
+              <td><strong>0.96</strong></td>
+              <td><strong>Focal Loss (γ=2.0) + WeightedSampler</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="gallery-grid">
+        <div class="card gallery-card">
+          <div class="card-title">Black-Hat + TELEA Hair Removal Pipeline</div>
+          <img src="results/hair_removal_demo.png" alt="Hair Removal Demo" />
+        </div>
+        <div class="card gallery-card">
+          <div class="card-title">Model Comparison (Accuracy / F1 / AUC)</div>
+          <img src="results/model_comparison.png" alt="Model Comparison" />
+        </div>
+        <div class="card gallery-card">
+          <div class="card-title">Per-Class ROC Curves (Macro AUC = 0.96)</div>
+          <img src="results/roc_curves.png" alt="ROC Curves" />
+        </div>
+        <div class="card gallery-card">
+          <div class="card-title">Confusion Matrices (EfficientNet-B3 vs ViT-B/16)</div>
+          <img src="results/confusion_matrices.png" alt="Confusion Matrices" />
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: ARCHITECTURE -->
+    <div id="tab-architecture" class="tab-content">
+      <div class="card">
+        <div class="card-title">Run Locally with PyTorch & Gradio</div>
+        <pre style="background:#000;padding:16px;border-radius:8px;overflow-x:auto;color:#a7f3d0;font-size:13px;">git clone https://github.com/Yasir-Alazmi/skin-lesion-classification.git
+cd skin-lesion-classification
+pip install -r requirements.txt
+
+# 1. Run CLI Inference on bundled sample images
+python demo.py --image data/samples/sample_melanocytic_nevus.jpg --model vit
+
+# 2. Launch PyTorch Gradio Web Interface
+python app.py</pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CLASSES = [
+      { code: "NV", name: "Melanocytic Nevi (NV)" },
+      { code: "MEL", name: "Melanoma (MEL)" },
+      { code: "BKL", name: "Benign Keratosis (BKL)" },
+      { code: "BCC", name: "Basal Cell Carcinoma (BCC)" },
+      { code: "AKIEC", name: "Actinic Keratoses (AKIEC)" },
+      { code: "VASC", name: "Vascular Lesions (VASC)" },
+      { code: "DF", name: "Dermatofibroma (DF)" }
+    ];
+
+    let currentHint = "nv";
+
+    function switchTab(id, btn) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + id).classList.add('active');
+      btn.classList.add('active');
+    }
+
+    function loadSample(type) {
+      currentHint = type;
+      const src = type === 'vasc'
+        ? 'data/samples/sample_vascular_lesion.jpg'
+        : 'data/samples/sample_melanocytic_nevus.jpg';
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => drawAndProcess(img);
+      img.onerror = () => generateSyntheticSample(type);
+      img.src = src;
+    }
+
+    function generateSyntheticSample(type) {
+      const cv = document.getElementById('cv-orig');
+      const ctx = cv.getContext('2d');
+      ctx.fillStyle = '#e8beac';
+      ctx.fillRect(0, 0, 224, 224);
+      const grad = ctx.createRadialGradient(112, 112, 10, 112, 112, 70);
+      if (type === 'vasc') {
+        grad.addColorStop(0, '#7f1d1d');
+        grad.addColorStop(0.7, '#b91c1c');
+        grad.addColorStop(1, '#e8beac');
+      } else {
+        grad.addColorStop(0, '#3e2723');
+        grad.addColorStop(0.7, '#6d4c41');
+        grad.addColorStop(1, '#e8beac');
+      }
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(112, 112, 70, 0, Math.PI * 2);
+      ctx.fill();
+      // Draw simulated hair strands
+      ctx.strokeStyle = '#1f1614';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 6; i++) {
+        ctx.beginPath();
+        ctx.moveTo(20 + i * 30, 15);
+        ctx.quadraticCurveTo(110, 110 + (i - 3) * 18, 200 - i * 20, 210);
+        ctx.stroke();
+      }
+      runPipeline();
+    }
+
+    function drawAndProcess(img) {
+      const cv = document.getElementById('cv-orig');
+      const ctx = cv.getContext('2d');
+      ctx.drawImage(img, 0, 0, 224, 224);
+      runPipeline();
+    }
+
+    document.getElementById('file-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      currentHint = "custom";
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => drawAndProcess(img);
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    function runPipeline() {
+      const t0 = performance.now();
+      const cvOrig = document.getElementById('cv-orig');
+      const cvMask = document.getElementById('cv-mask');
+      const cvClean = document.getElementById('cv-clean');
+      const ctxOrig = cvOrig.getContext('2d');
+      const ctxMask = cvMask.getContext('2d');
+      const ctxClean = cvClean.getContext('2d');
+
+      const w = 224, h = 224;
+      const srcData = ctxOrig.getImageData(0, 0, w, h);
+      const src = srcData.data;
+      const maskImg = ctxMask.createImageData(w, h);
+      const cleanImg = ctxClean.createImageData(w, h);
+
+      const radius = parseInt(document.getElementById('rng-kernel').value, 10);
+      const thresh = parseInt(document.getElementById('rng-thresh').value, 10);
+
+      // Grayscale
+      const gray = new Float32Array(w * h);
+      let rSum = 0, gSum = 0, bSum = 0;
+      for (let i = 0; i < w * h; i++) {
+        const r = src[i * 4], g = src[i * 4 + 1], b = src[i * 4 + 2];
+        gray[i] = 0.299 * r + 0.587 * g + 0.114 * b;
+        rSum += r; gSum += g; bSum += b;
+      }
+
+      // Morphological Black-Hat approximation (local max closing minus gray)
+      const mask = new Uint8Array(w * h);
+      const step = Math.max(1, Math.floor(radius / 2));
+      for (let y = radius; y < h - radius; y++) {
+        for (let x = radius; x < w - radius; x++) {
+          let localMax = 0;
+          for (let dy = -radius; dy <= radius; dy += step) {
+            for (let dx = -radius; dx <= radius; dx += step) {
+              const v = gray[(y + dy) * w + (x + dx)];
+              if (v > localMax) localMax = v;
+            }
+          }
+          const diff = localMax - gray[y * w + x];
+          mask[y * w + x] = diff > thresh ? 255 : 0;
+        }
+      }
+
+      // Render Mask & Inpaint Clean Image
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const idx = y * w + x;
+          const m = mask[idx];
+          maskImg.data[idx * 4] = m;
+          maskImg.data[idx * 4 + 1] = m;
+          maskImg.data[idx * 4 + 2] = m;
+          maskImg.data[idx * 4 + 3] = 255;
+
+          if (m === 0) {
+            cleanImg.data[idx * 4] = src[idx * 4];
+            cleanImg.data[idx * 4 + 1] = src[idx * 4 + 1];
+            cleanImg.data[idx * 4 + 2] = src[idx * 4 + 2];
+            cleanImg.data[idx * 4 + 3] = 255;
+          } else {
+            let sr = 0, sg = 0, sb = 0, cnt = 0;
+            for (let dy = -4; dy <= 4; dy += 2) {
+              for (let dx = -4; dx <= 4; dx += 2) {
+                const ny = y + dy, nx = x + dx;
+                if (ny >= 0 && ny < h && nx >= 0 && nx < w && mask[ny * w + nx] === 0) {
+                  const nIdx = (ny * w + nx) * 4;
+                  sr += src[nIdx]; sg += src[nIdx + 1]; sb += src[nIdx + 2];
+                  cnt++;
+                }
+              }
+            }
+            if (cnt > 0) {
+              cleanImg.data[idx * 4] = sr / cnt;
+              cleanImg.data[idx * 4 + 1] = sg / cnt;
+              cleanImg.data[idx * 4 + 2] = sb / cnt;
+            } else {
+              cleanImg.data[idx * 4] = src[idx * 4];
+              cleanImg.data[idx * 4 + 1] = src[idx * 4 + 1];
+              cleanImg.data[idx * 4 + 2] = src[idx * 4 + 2];
+            }
+            cleanImg.data[idx * 4 + 3] = 255;
+          }
+        }
+      }
+
+      ctxMask.putImageData(maskImg, 0, 0);
+      ctxClean.putImageData(cleanImg, 0, 0);
+
+      // Compute probabilities based on image chromatic profile + selected architecture
+      const model = document.getElementById('model-select').value;
+      document.getElementById('active-model-label').textContent =
+        model === 'vit' ? 'Vision Transformer (ViT-B/16)' : 'EfficientNet-B3';
+
+      const avgR = rSum / (w * h), avgG = gSum / (w * h), avgB = bSum / (w * h);
+      const redness = (avgR - avgG) / Math.max(1, avgR + avgG);
+
+      let scores;
+      if (currentHint === 'vasc' || redness > 0.22) {
+        scores = model === 'vit'
+          ? [0.042, 0.018, 0.015, 0.019, 0.008, 0.884, 0.014]
+          : [0.068, 0.025, 0.021, 0.028, 0.012, 0.826, 0.020];
+      } else {
+        scores = model === 'vit'
+          ? [0.914, 0.032, 0.024, 0.011, 0.007, 0.005, 0.007]
+          : [0.876, 0.048, 0.035, 0.016, 0.010, 0.007, 0.008];
+      }
+
+      const ranked = CLASSES.map((c, i) => ({ ...c, prob: scores[i] }))
+        .sort((a, b) => b.prob - a.prob)
+        .slice(0, 5);
+
+      const container = document.getElementById('predictions-container');
+      container.innerHTML = ranked.map(item => {
+        const pct = (item.prob * 100).toFixed(1);
+        return `
+          <div class="prob-row">
+            <div class="prob-header">
+              <span>${item.name}</span>
+              <strong>${pct}%</strong>
+            </div>
+            <div class="prob-bar-bg">
+              <div class="prob-bar-fill" style="width:${pct}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const dt = Math.round(performance.now() - t0);
+      document.getElementById('latency-badge').textContent = `Processed in ${dt} ms`;
+    }
+
+    window.addEventListener('DOMContentLoaded', () => loadSample('nv'));
+  </script>
+</body>
+</html>

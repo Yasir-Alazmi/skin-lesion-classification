@@ -8,6 +8,16 @@ Compares Vision Transformer (ViT-B/16) and EfficientNet-B3 with hair removal inp
 import sys
 from pathlib import Path
 
+try:
+    import spaces
+
+    gpu_decorator = spaces.GPU(duration=20)
+except ImportError:
+
+    def gpu_decorator(fn):
+        return fn
+
+
 import cv2
 import numpy as np
 import torch
@@ -38,6 +48,7 @@ def get_model(model_choice: str):
     return MODELS[key]
 
 
+@gpu_decorator
 def classify_lesion(image: np.ndarray, model_choice: str):
     if image is None:
         return None, {}
@@ -84,7 +95,8 @@ def launch():
     examples = []
     if sample_dir.exists():
         for ext in ("*.jpg", "*.png", "*.jpeg"):
-            examples.extend([str(p) for p in sample_dir.glob(ext)])
+            for p in sorted(sample_dir.glob(ext)):
+                examples.append([str(p), "Vision Transformer (ViT-B/16)"])
 
     demo = gr.Interface(
         fn=classify_lesion,
@@ -114,7 +126,6 @@ def launch():
             "and must **not** be used as a medical diagnostic device."
         ),
         examples=examples if examples else None,
-        theme="default",
     )
 
     demo.launch()
