@@ -1,4 +1,5 @@
 """Basic smoke tests — no GPU or dataset required."""
+
 import importlib
 import sys
 import types
@@ -21,12 +22,14 @@ def test_src_imports():
 
 def test_class_names_length():
     from src.config import CLASS_NAMES
+
     assert len(CLASS_NAMES) == 7, "Expected 7 HAM10000 classes"
 
 
 def test_focal_loss_forward():
     """FocalLoss forward pass with dummy tensors."""
     import torch
+
     from src.loss import FocalLoss
 
     criterion = FocalLoss(gamma=2.0)
@@ -40,6 +43,7 @@ def test_focal_loss_forward():
 def test_model_output_shape_efficientnet():
     """EfficientNet-B3 should output (batch, 7) without GPU."""
     import torch
+
     from src.models import build_efficientnet
 
     model = build_efficientnet(num_classes=7, pretrained=False)
@@ -53,6 +57,7 @@ def test_model_output_shape_efficientnet():
 def test_model_output_shape_vit():
     """ViT-B/16 should output (batch, 7) without GPU."""
     import torch
+
     from src.models import build_vit
 
     model = build_vit(num_classes=7, pretrained=False)
@@ -66,6 +71,7 @@ def test_model_output_shape_vit():
 def test_get_splits_stratified_group_leakage_isolation():
     """Verify that multi-image lesions are never split across train and test sets."""
     import pandas as pd
+
     from src.dataset import get_splits
 
     # Create synthetic metadata with duplicate lesion_ids (patient-level clustering)
@@ -84,7 +90,12 @@ def test_get_splits_stratified_group_leakage_isolation():
     test_lesions = set(test_df["lesion_id"])
 
     # Assert ZERO patient/lesion leakage across splits
-    assert train_lesions.isdisjoint(test_lesions), "Clinical data leakage detected between train and test!"
-    assert train_lesions.isdisjoint(val_lesions), "Clinical data leakage detected between train and val!"
-    assert val_lesions.isdisjoint(test_lesions), "Clinical data leakage detected between val and test!"
-
+    assert train_lesions.isdisjoint(
+        test_lesions
+    ), "Clinical data leakage detected between train and test!"
+    assert train_lesions.isdisjoint(
+        val_lesions
+    ), "Clinical data leakage detected between train and val!"
+    assert val_lesions.isdisjoint(
+        test_lesions
+    ), "Clinical data leakage detected between val and test!"

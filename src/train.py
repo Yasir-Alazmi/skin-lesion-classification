@@ -381,3 +381,68 @@ def train_model(
     model.load_state_dict(best_weights)
     print(f"\nTraining complete.  Best val AUC: {best_val_auc:.4f}")
     return history
+
+
+def main() -> None:
+    """CLI entrypoint for training EfficientNet-B3 or ViT-B/16 on HAM10000."""
+    import argparse
+
+    import pandas as pd
+
+    from src.config import BATCH_SIZE, HAM_METADATA_CSV, NUM_EPOCHS, set_seed
+    from src.dataset import build_loaders
+    from src.models import build_efficientnet, build_vit
+
+    parser = argparse.ArgumentParser(description="Train HAM10000 Skin Lesion Classifier")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="vit",
+        choices=["vit", "efficientnet"],
+        help="Model architecture to train",
+    )
+    parser.add_argument("--epochs", type=int, default=NUM_EPOCHS, help="Number of training epochs")
+    parser.add_argument("--batch-size", type=int, default=BATCH_SIZE, help="Mini-batch size")
+    parser.add_argument("--lr", type=float, default=LR, help="Initial learning rate")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Verify CLI and model instantiation without requiring the full HAM10000 dataset",
+    )
+    args = parser.parse_args()
+
+    set_seed()
+    if args.dry_run:
+        m = (
+            build_vit(pretrained=False)
+            if args.model == "vit"
+            else build_efficientnet(pretrained=False)
+        )
+        n_params = sum(p.numel() for p in m.parameters())
+        print(f"[Dry-Run OK] Initialized {args.model} ({n_params:,} params)")
+        return
+
+    if not os.path.exists(HAM_METADATA_CSV):
+        raise FileNotFoundError(
+            f"HAM10000 metadata not found at {HAM_METADATA_CSV}. "
+            "Download dataset first or run with --dry-run."
+        )
+
+    df = pd.read_csv(HAM_METADATA_CSV)
+    train_loader, val_loader, _ = build_loaders(df, batch_size=args.batch_size)
+    model = (
+        build_vit(pretrained=True) if args.model == "vit" else build_efficientnet(pretrained=True)
+    )
+    model_title = "ViT-B/16" if args.model == "vit" else "EfficientNet-B3"
+    train_model(
+        model,
+        train_loader,
+        val_loader,
+        model_name=model_title,
+        num_epochs=args.epochs,
+        lr=args.lr,
+    )
+
+
+if __name__ == "__main__":
+    main()

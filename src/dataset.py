@@ -44,7 +44,7 @@ from src.config import (
     TRAIN_RATIO,
     VAL_RATIO,
 )
-from src.preprocess import remove_hair
+from src.preprocess import read_image_bgr, remove_hair
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Transform pipelines
@@ -170,11 +170,9 @@ class HAMDataset(Dataset):
         image_id: str = row["image_id"]
         label: int = LABEL_MAP[row["dx"]]
 
-        # Load image via OpenCV (BGR) then convert to RGB PIL
+        # Load image via Unicode-safe BGR reader then convert to RGB PIL
         path = self._find_image(image_id)
-        img_bgr = cv2.imread(str(path))
-        if img_bgr is None:
-            raise RuntimeError(f"cv2.imread failed for: {path}")
+        img_bgr = read_image_bgr(path)
 
         if self.apply_hair_removal:
             img_bgr = remove_hair(img_bgr)

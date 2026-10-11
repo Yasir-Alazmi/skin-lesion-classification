@@ -88,6 +88,10 @@ jobs:
         run: |
           echo "Checking required files..."
           for f in README.md LICENSE requirements.txt pyproject.toml CONTRIBUTING.md CHANGELOG.md \
+                   app.py demo.py index.html \
+                   data/samples/sample_nv.jpg data/samples/sample_mel.jpg data/samples/sample_bkl.jpg \
+                   data/samples/sample_bcc.jpg data/samples/sample_akiec.jpg data/samples/sample_vasc.jpg \
+                   data/samples/sample_df.jpg \
                    src/config.py src/dataset.py src/models.py src/train.py src/evaluate.py \
                    src/visualize.py src/preprocess.py src/loss.py; do
             if [ ! -f "$f" ]; then

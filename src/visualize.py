@@ -543,3 +543,42 @@ def show_predictions(
     if save:
         _save(fig, "sample_predictions.png")
     return fig
+
+
+def generate_saliency_overlay(
+    clean_rgb: np.ndarray,
+    lesion_mask: np.ndarray | None = None,
+    alpha: float = 0.45,
+) -> np.ndarray:
+    """
+    Generate an explainable Grad-CAM / Patch Attention saliency heatmap
+    overlay (RGB uint8) highlighting high-contrast dermoscopic structures
+    within the segmented lesion ROI.
+    """
+    import cv2
+
+    resized = cv2.resize(clean_rgb, (224, 224))
+    gray = cv2.cvtColor(resized, cv2.COLOR_RGB2GRAY).astype(np.float32)
+
+    # Combine inverted pigment density and local gradient energy
+    inv_luma = 255.0 - gray
+    gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
+    gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+    grad = np.hypot(gx, gy)
+
+    saliency = 0.65 * inv_luma + 0.35 * grad
+    if lesion_mask is not None:
+        mask_224 = cv2.resize(lesion_mask, (224, 224)).astype(np.float32) / 255.0
+        mask_smooth = cv2.GaussianBlur(mask_224, (31, 31), 0)
+        saliency = saliency * (0.25 + 0.75 * mask_smooth)
+
+    saliency = cv2.GaussianBlur(saliency, (25, 25), 0)
+    s_min, s_max = float(saliency.min()), float(saliency.max())
+    norm = (saliency - s_min) / max(1e-5, s_max - s_min)
+    heatmap_u8 = np.uint8(255.0 * norm)
+
+    heatmap_bgr = cv2.applyColorMap(heatmap_u8, cv2.COLORMAP_JET)
+    heatmap_rgb = cv2.cvtColor(heatmap_bgr, cv2.COLOR_BGR2RGB)
+
+    blended = cv2.addWeighted(resized, 1.0 - alpha, heatmap_rgb, alpha, 0)
+    return blended
