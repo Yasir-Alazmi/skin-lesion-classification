@@ -371,7 +371,10 @@ def train_model(
 
     if use_amp is None:
         use_amp = device.type == "cuda"
-    scaler = torch.amp.GradScaler(device.type, enabled=use_amp)
+    if hasattr(torch.amp, "GradScaler"):  # torch >= 2.3
+        scaler = torch.amp.GradScaler(device.type, enabled=use_amp)
+    else:  # torch 2.1 / 2.2 (the version pinned in pyproject.toml and CI)
+        scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
 
     model = model.to(device)
 
