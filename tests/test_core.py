@@ -1,19 +1,15 @@
-"""Comprehensive unit tests for preprocessing, ABCD biomarkers, saliency, and app pipeline."""
+"""Comprehensive unit tests for preprocessing, ABCD biomarkers, and saliency."""
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-import numpy as np
-
 repo_root = Path(__file__).resolve().parent.parent
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from app import classify_lesion  # noqa: E402
 from src.preprocess import (  # noqa: E402
-    compute_calibrated_probabilities,
     extract_abcd_features,
     read_image_bgr,
     remove_hair_with_mask,
@@ -58,28 +54,12 @@ def test_remove_hair_with_mask_and_abcd():
     assert 0.0 <= abcd["structure_score"] <= 100.0
     assert abcd["tds_score"] > 0.0
 
-    probs = compute_calibrated_probabilities(clean_bgr, abcd=abcd, model_key="vit")
-    assert probs.shape == (7,)
-    assert np.isclose(probs.sum(), 1.0, atol=1e-4)
 
-
-def test_saliency_overlay_and_gradio_classify_lesion():
-    """Saliency heatmap and Gradio classify_lesion must return valid RGB arrays and 7 classes."""
+def test_saliency_overlay():
+    """Saliency heatmap must return a valid 224x224 RGB array."""
     sample_path = repo_root / "data" / "samples" / "sample_nv.jpg"
-    img_bgr = read_image_bgr(sample_path)
-    img_rgb = img_bgr[:, :, ::-1].copy()
-
-    overlay = generate_saliency_overlay(img_rgb)
-    assert overlay.shape == (224, 224, 3)
-
-    clean_rgb, contour_rgb, saliency_rgb, confidences, abcd_md = classify_lesion(
-        img_rgb, "Vision Transformer (ViT-B/16)", 17, 10
-    )
-    assert clean_rgb.shape == img_rgb.shape
-    assert contour_rgb.shape == (224, 224, 3)
-    assert saliency_rgb.shape == (224, 224, 3)
-    assert len(confidences) == 7
-    assert "Stolz ABCD" in abcd_md
+    img_rgb = read_image_bgr(sample_path)[:, :, ::-1].copy()
+    assert generate_saliency_overlay(img_rgb).shape == (224, 224, 3)
 
 
 def test_early_stopping_behavior():

@@ -71,3 +71,6 @@ secrets.json
 runs/
 wandb/
 lightning_logs/
+
+# Ensemble weights (hundreds of MB); the config JSON is tracked
+models/ensemble/*.pt

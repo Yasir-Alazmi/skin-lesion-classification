@@ -1,0 +1,42 @@
+{
+ "description": "4 x ConvNeXt-S (timm convnext_small.fb_in22k_ft_in1k_384), lesion-grouped HAM10000, flip TTA, log-prob average + per-class log bias",
+ "timm_model": "convnext_small.fb_in22k_ft_in1k_384",
+ "members": [
+  {
+   "file": "cnx384_s42.pt",
+   "size": 384
+  },
+  {
+   "file": "cnx384_s7.pt",
+   "size": 384
+  },
+  {
+   "file": "cnx448_s42.pt",
+   "size": 448
+  },
+  {
+   "file": "cnx448_s7.pt",
+   "size": 448
+  }
+ ],
+ "class_order": [
+  "nv",
+  "mel",
+  "bkl",
+  "bcc",
+  "akiec",
+  "vasc",
+  "df"
+ ],
+ "bias": [
+  -1.5,
+  -0.75,
+  -1.25,
+  -1.25,
+  0.75,
+  1.0,
+  1.5
+ ],
+ "tta": "identity, horizontal flip, vertical flip, both",
+ "note": "Reported test metrics (results/final_r2_metrics.json) are for a 5-member ensemble that also contained one R1 ConvNeXt-S 384 model whose weights were not kept. This 4-member ensemble is what the demo runs; its own test score was not measured (the test set was not re-used)."
+}

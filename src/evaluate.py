@@ -16,6 +16,8 @@ full_evaluation(model, loader, criterion, class_names, device)
 
 from __future__ import annotations
 
+import sys
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -41,6 +43,7 @@ def evaluate(
     loader: DataLoader,
     criterion: nn.Module,
     device: torch.device = DEVICE,
+    use_amp: bool | None = None,
 ) -> dict:
     """
     Run inference over an entire DataLoader without computing gradients.
@@ -52,17 +55,22 @@ def evaluate(
     criterion : nn.Module
         Loss function used only for computing the scalar loss value.
     device : torch.device
+    use_amp : bool or None
+        Run the forward pass under fp16 autocast.  ``None`` enables it on CUDA only.
 
     Returns
     -------
     dict with keys:
         'loss'       – float, mean loss over all samples
         'accuracy'   – float, overall accuracy
-        'auc'        – float, macro one-vs-rest AUC
+        'f1_macro'   – float, macro-averaged F1 (the model-selection metric)
+        'auc'        – float, macro one-vs-rest AUC (NaN if a class is absent)
         'probs'      – np.ndarray (N, C), softmax probabilities
         'preds'      – np.ndarray (N,), predicted class indices
         'labels'     – np.ndarray (N,), ground-truth class indices
     """
+    if use_amp is None:
+        use_amp = device.type == "cuda"
     model.eval()
     all_logits: list[torch.Tensor] = []
     all_labels: list[torch.Tensor] = []
@@ -70,11 +78,15 @@ def evaluate(
     total = 0
 
     with torch.no_grad():
-        for images, labels in tqdm(loader, desc="Eval", leave=False):
+        for images, labels in tqdm(
+            loader, desc="Eval", leave=False, disable=not sys.stderr.isatty()
+        ):
             images = images.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
 
-            logits = model(images)
+            with torch.autocast(device_type=device.type, enabled=use_amp):
+                logits = model(images)
+            logits = logits.float()
             loss = criterion(logits, labels)
 
             running_loss += loss.item() * images.size(0)
@@ -95,11 +107,18 @@ def evaluate(
 
     # Macro one-vs-rest AUC (requires binarised labels)
     labels_bin = label_binarize(labels_cat, classes=list(range(NUM_CLASSES)))
-    auc = roc_auc_score(labels_bin, probs, multi_class="ovr", average="macro")
+    try:
+        auc = roc_auc_score(labels_bin, probs, multi_class="ovr", average="macro")
+    except ValueError:  # a class is absent from this (sub)set
+        auc = float("nan")
+    f1_macro = f1_score(
+        labels_cat, preds, average="macro", labels=list(range(NUM_CLASSES)), zero_division=0
+    )
 
     return {
         "loss": avg_loss,
         "accuracy": accuracy,
+        "f1_macro": f1_macro,
         "auc": auc,
         "probs": probs,
         "preds": preds,

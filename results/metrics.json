@@ -1,0 +1,522 @@
+{
+  "meta": {
+    "n_images": 1503,
+    "n_lesions": 1118,
+    "n_boot": 1000,
+    "seed": 42,
+    "resampling_unit": "lesion_id",
+    "ci": "95% percentile bootstrap"
+  },
+  "models": {
+    "ViT-B/16": {
+      "accuracy": {
+        "value": 0.8057,
+        "ci_low": 0.7822,
+        "ci_high": 0.8297
+      },
+      "balanced_accuracy": {
+        "value": 0.7123,
+        "ci_low": 0.6627,
+        "ci_high": 0.7606
+      },
+      "macro_f1": {
+        "value": 0.7104,
+        "ci_low": 0.6607,
+        "ci_high": 0.7507
+      },
+      "macro_auc": {
+        "value": 0.9549,
+        "ci_low": 0.9458,
+        "ci_high": 0.9638
+      },
+      "per_class": {
+        "nv": {
+          "sensitivity": {
+            "value": 0.8975,
+            "ci_low": 0.8761,
+            "ci_high": 0.919
+          },
+          "specificity": {
+            "value": 0.8072,
+            "ci_low": 0.7649,
+            "ci_high": 0.85
+          },
+          "f1": {
+            "value": 0.9006,
+            "ci_low": 0.8839,
+            "ci_high": 0.9173
+          },
+          "auc": {
+            "value": 0.9371,
+            "ci_low": 0.9213,
+            "ci_high": 0.9526
+          }
+        },
+        "mel": {
+          "sensitivity": {
+            "value": 0.6726,
+            "ci_low": 0.5736,
+            "ci_high": 0.7641
+          },
+          "specificity": {
+            "value": 0.9071,
+            "ci_low": 0.889,
+            "ci_high": 0.9244
+          },
+          "f1": {
+            "value": 0.558,
+            "ci_low": 0.4712,
+            "ci_high": 0.6351
+          },
+          "auc": {
+            "value": 0.8851,
+            "ci_low": 0.8505,
+            "ci_high": 0.9155
+          }
+        },
+        "bkl": {
+          "sensitivity": {
+            "value": 0.503,
+            "ci_low": 0.405,
+            "ci_high": 0.5988
+          },
+          "specificity": {
+            "value": 0.9806,
+            "ci_low": 0.9726,
+            "ci_high": 0.9885
+          },
+          "f1": {
+            "value": 0.6058,
+            "ci_low": 0.5158,
+            "ci_high": 0.6887
+          },
+          "auc": {
+            "value": 0.9176,
+            "ci_low": 0.8797,
+            "ci_high": 0.9486
+          }
+        },
+        "bcc": {
+          "sensitivity": {
+            "value": 0.6538,
+            "ci_low": 0.5405,
+            "ci_high": 0.7703
+          },
+          "specificity": {
+            "value": 0.986,
+            "ci_low": 0.977,
+            "ci_high": 0.9936
+          },
+          "f1": {
+            "value": 0.6846,
+            "ci_low": 0.584,
+            "ci_high": 0.7809
+          },
+          "auc": {
+            "value": 0.9761,
+            "ci_low": 0.9631,
+            "ci_high": 0.9862
+          }
+        },
+        "akiec": {
+          "sensitivity": {
+            "value": 0.6122,
+            "ci_low": 0.4545,
+            "ci_high": 0.7562
+          },
+          "specificity": {
+            "value": 0.9876,
+            "ci_low": 0.9815,
+            "ci_high": 0.9931
+          },
+          "f1": {
+            "value": 0.6186,
+            "ci_low": 0.4675,
+            "ci_high": 0.7324
+          },
+          "auc": {
+            "value": 0.9759,
+            "ci_low": 0.9592,
+            "ci_high": 0.9878
+          }
+        },
+        "vasc": {
+          "sensitivity": {
+            "value": 1.0,
+            "ci_low": 1.0,
+            "ci_high": 1.0
+          },
+          "specificity": {
+            "value": 0.9993,
+            "ci_low": 0.9979,
+            "ci_high": 1.0
+          },
+          "f1": {
+            "value": 0.9767,
+            "ci_low": 0.9143,
+            "ci_high": 1.0
+          },
+          "auc": {
+            "value": 0.9998,
+            "ci_low": 0.9993,
+            "ci_high": 1.0
+          }
+        },
+        "df": {
+          "sensitivity": {
+            "value": 0.6471,
+            "ci_low": 0.3808,
+            "ci_high": 0.9
+          },
+          "specificity": {
+            "value": 0.9953,
+            "ci_low": 0.9914,
+            "ci_high": 0.9986
+          },
+          "f1": {
+            "value": 0.6286,
+            "ci_low": 0.3783,
+            "ci_high": 0.8085
+          },
+          "auc": {
+            "value": 0.9928,
+            "ci_low": 0.9866,
+            "ci_high": 0.9981
+          }
+        }
+      },
+      "confusion_matrix": [
+        [
+          902,
+          80,
+          9,
+          11,
+          1,
+          0,
+          2
+        ],
+        [
+          43,
+          113,
+          5,
+          1,
+          5,
+          0,
+          1
+        ],
+        [
+          38,
+          34,
+          83,
+          4,
+          6,
+          0,
+          0
+        ],
+        [
+          6,
+          7,
+          5,
+          51,
+          6,
+          1,
+          2
+        ],
+        [
+          6,
+          3,
+          6,
+          2,
+          30,
+          0,
+          2
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          21,
+          0
+        ],
+        [
+          3,
+          0,
+          1,
+          2,
+          0,
+          0,
+          11
+        ]
+      ]
+    },
+    "EfficientNet-B3": {
+      "accuracy": {
+        "value": 0.7405,
+        "ci_low": 0.7148,
+        "ci_high": 0.7652
+      },
+      "balanced_accuracy": {
+        "value": 0.6535,
+        "ci_low": 0.6025,
+        "ci_high": 0.7041
+      },
+      "macro_f1": {
+        "value": 0.6122,
+        "ci_low": 0.56,
+        "ci_high": 0.6548
+      },
+      "macro_auc": {
+        "value": 0.9341,
+        "ci_low": 0.9212,
+        "ci_high": 0.945
+      },
+      "per_class": {
+        "nv": {
+          "sensitivity": {
+            "value": 0.8189,
+            "ci_low": 0.7907,
+            "ci_high": 0.8483
+          },
+          "specificity": {
+            "value": 0.8675,
+            "ci_low": 0.8309,
+            "ci_high": 0.9052
+          },
+          "f1": {
+            "value": 0.8691,
+            "ci_low": 0.8508,
+            "ci_high": 0.8883
+          },
+          "auc": {
+            "value": 0.9393,
+            "ci_low": 0.9255,
+            "ci_high": 0.9525
+          }
+        },
+        "mel": {
+          "sensitivity": {
+            "value": 0.5298,
+            "ci_low": 0.4382,
+            "ci_high": 0.6136
+          },
+          "specificity": {
+            "value": 0.8719,
+            "ci_low": 0.8493,
+            "ci_high": 0.8922
+          },
+          "f1": {
+            "value": 0.4159,
+            "ci_low": 0.3349,
+            "ci_high": 0.489
+          },
+          "auc": {
+            "value": 0.812,
+            "ci_low": 0.7741,
+            "ci_high": 0.8454
+          }
+        },
+        "bkl": {
+          "sensitivity": {
+            "value": 0.5515,
+            "ci_low": 0.4588,
+            "ci_high": 0.6452
+          },
+          "specificity": {
+            "value": 0.9514,
+            "ci_low": 0.9377,
+            "ci_high": 0.9632
+          },
+          "f1": {
+            "value": 0.567,
+            "ci_low": 0.4857,
+            "ci_high": 0.6426
+          },
+          "auc": {
+            "value": 0.8878,
+            "ci_low": 0.8552,
+            "ci_high": 0.92
+          }
+        },
+        "bcc": {
+          "sensitivity": {
+            "value": 0.6026,
+            "ci_low": 0.4947,
+            "ci_high": 0.7059
+          },
+          "specificity": {
+            "value": 0.9796,
+            "ci_low": 0.9716,
+            "ci_high": 0.9873
+          },
+          "f1": {
+            "value": 0.6104,
+            "ci_low": 0.5133,
+            "ci_high": 0.7018
+          },
+          "auc": {
+            "value": 0.9679,
+            "ci_low": 0.9488,
+            "ci_high": 0.9824
+          }
+        },
+        "akiec": {
+          "sensitivity": {
+            "value": 0.7551,
+            "ci_low": 0.617,
+            "ci_high": 0.8704
+          },
+          "specificity": {
+            "value": 0.9691,
+            "ci_low": 0.9601,
+            "ci_high": 0.977
+          },
+          "f1": {
+            "value": 0.5649,
+            "ci_low": 0.4364,
+            "ci_high": 0.6667
+          },
+          "auc": {
+            "value": 0.9728,
+            "ci_low": 0.9525,
+            "ci_high": 0.9857
+          }
+        },
+        "vasc": {
+          "sensitivity": {
+            "value": 0.9048,
+            "ci_low": 0.75,
+            "ci_high": 1.0
+          },
+          "specificity": {
+            "value": 0.9939,
+            "ci_low": 0.9888,
+            "ci_high": 0.998
+          },
+          "f1": {
+            "value": 0.7755,
+            "ci_low": 0.5861,
+            "ci_high": 0.9057
+          },
+          "auc": {
+            "value": 0.9923,
+            "ci_low": 0.9816,
+            "ci_high": 0.9996
+          }
+        },
+        "df": {
+          "sensitivity": {
+            "value": 0.4118,
+            "ci_low": 0.1818,
+            "ci_high": 0.6667
+          },
+          "specificity": {
+            "value": 0.9966,
+            "ci_low": 0.9934,
+            "ci_high": 0.9993
+          },
+          "f1": {
+            "value": 0.4828,
+            "ci_low": 0.2222,
+            "ci_high": 0.6667
+          },
+          "auc": {
+            "value": 0.9668,
+            "ci_low": 0.9052,
+            "ci_high": 0.9958
+          }
+        }
+      },
+      "confusion_matrix": [
+        [
+          823,
+          124,
+          34,
+          14,
+          3,
+          6,
+          1
+        ],
+        [
+          38,
+          89,
+          21,
+          4,
+          12,
+          3,
+          1
+        ],
+        [
+          22,
+          31,
+          91,
+          4,
+          15,
+          0,
+          2
+        ],
+        [
+          1,
+          11,
+          5,
+          47,
+          13,
+          0,
+          1
+        ],
+        [
+          1,
+          2,
+          5,
+          4,
+          37,
+          0,
+          0
+        ],
+        [
+          2,
+          0,
+          0,
+          0,
+          0,
+          19,
+          0
+        ],
+        [
+          2,
+          3,
+          0,
+          3,
+          2,
+          0,
+          7
+        ]
+      ]
+    }
+  },
+  "comparison": {
+    "a": "ViT-B/16",
+    "b": "EfficientNet-B3",
+    "accuracy": {
+      "value": 0.0652,
+      "ci_low": 0.0386,
+      "ci_high": 0.0907
+    },
+    "balanced_accuracy": {
+      "value": 0.0588,
+      "ci_low": 0.0153,
+      "ci_high": 0.1052
+    },
+    "macro_f1": {
+      "value": 0.0982,
+      "ci_low": 0.0527,
+      "ci_high": 0.1511
+    },
+    "macro_auc": {
+      "value": 0.0208,
+      "ci_low": 0.0115,
+      "ci_high": 0.032
+    }
+  }
+}

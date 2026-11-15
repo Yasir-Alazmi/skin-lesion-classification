@@ -1,383 +1,161 @@
 ---
-title: Tashkhees Skin Lesion Classification
+title: Skin Lesion Classifier (research demo)
 emoji: 🔬
 colorFrom: blue
 colorTo: indigo
-sdk: static
-pinned: true
+sdk: gradio
+sdk_version: 6.31.0
+python_version: "3.10"
+app_file: app.py
+pinned: false
 license: mit
-short_description: ViT-B/16 vs EfficientNet-B3 Dermoscopic Benchmark (HAM10000)
+short_description: ConvNeXt-S ensemble on HAM10000, lesion-grouped evaluation. Research demo.
 ---
 
-# Skin Lesion Classification — EfficientNet-B3 vs ViT-B/16
+# Skin Lesion Classification on HAM10000: ConvNeXt-S ensemble vs ViT-B/16 and EfficientNet-B3
 
-> A PyTorch deep-learning benchmark comparing CNN and Vision Transformer architectures for 7-class dermoscopic image classification on the HAM10000 dataset.
+7-class dermoscopic image classification, evaluated with a **lesion-grouped split** so that no lesion appears in both training and test data. Includes a Gradio demo that runs the real trained models.
 
-[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces%20Live%20Demo-blue)](https://huggingface.co/spaces/Yasir-Alazmi/tashkhees-skin-lesion)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://python.org)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-orange)](https://pytorch.org)
-[![timm](https://img.shields.io/badge/timm-0.9.12-green)](https://github.com/huggingface/pytorch-image-models)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+> **Research project, not a medical device.** Not clinically validated. See [Limitations](#limitations).
+
 [![CI](https://github.com/Yasir-Alazmi/skin-lesion-classification/actions/workflows/ci.yml/badge.svg)](https://github.com/Yasir-Alazmi/skin-lesion-classification/actions/workflows/ci.yml)
-[![Accuracy](https://img.shields.io/badge/ViT--B%2F16%20Accuracy-94.2%25-brightgreen)](results/README.md)
-[![AUC](https://img.shields.io/badge/Macro%20AUC-0.96-blue)](results/README.md)
-[![Kaggle](https://img.shields.io/badge/Kaggle-Notebook-20BEFF?logo=kaggle&logoColor=white)](https://www.kaggle.com/code/yasirnalazmi/ham10000-dataset-efficientnet-vs-vision-transfo)
-
----
-
-## 📓 Kaggle Notebook
-
-The full experiment — data loading, preprocessing, training, and evaluation — is available as a reproducible Kaggle Notebook:
-
-> **[HAM10000 Dataset: EfficientNet vs Vision Transformer](https://www.kaggle.com/code/yasirnalazmi/ham10000-dataset-efficientnet-vs-vision-transfo)**
-
-The notebook covers:
-- HAM10000 dataset exploration and class distribution analysis
-- Hair removal preprocessing pipeline (Black-Hat morphology + TELEA inpainting)
-- EfficientNet-B3 and ViT-B/16 training with Focal Loss and WeightedRandomSampler
-- Full evaluation: confusion matrices, ROC curves, per-class metrics
-- Side-by-side model comparison
-
----
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://python.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## Results
 
-| Model | Accuracy | Macro F1 | Macro AUC |
-|-------|----------|----------|-----------|
-| ResNet-50 (baseline) | 88.1% | 86.3% | 0.92 |
-| EfficientNet-B3 | 92.6% | 91.9% | 0.95 |
-| **ViT-B/16** | **94.2%** | **93.8%** | **0.96** |
+Held-out test set: 1,503 images (1,118 lesions). 95% bootstrap CIs in brackets (lesion-level resampling, 1,000 resamples, seed 42).
 
-> Best checkpoint: `models/checkpoints/best_vit_b16.pth` — see [models/README.md](models/README.md) for download instructions.
+### v2.1: ConvNeXt-S ensemble
 
-### Training History
-![Training History](results/training_history.png)
+Five ConvNeXt-S models (ImageNet-22k pre-training, 384 and 448 px, two seeds, flip test-time augmentation), averaged in log-probability space, with a per-class bias tuned on the validation set. Compared with the v2.0 ViT-B/16 baseline below:
 
-### Model Comparison
-![Model Comparison](results/model_comparison.png)
+| Model | Accuracy | Macro-F1 | Balanced acc. | Macro-AUC | Melanoma sens. |
+|-------|----------|----------|---------------|-----------|----------------|
+| **ConvNeXt-S ensemble + bias** | 0.837 [0.815, 0.860] | **0.786** [0.738, 0.824] | **0.819** [0.783, 0.852] | 0.969 | 0.720 [0.640, 0.801] |
+| Same ensemble, no bias | 0.850 | 0.780 | 0.770 | 0.971 | 0.649 |
+| ViT-B/16 (v2.0 baseline) | 0.806 | 0.710 | 0.712 | 0.955 | 0.673 |
 
-### Confusion Matrices
-![Confusion Matrices](results/confusion_matrices.png)
+Paired bootstrap difference to the baseline: balanced accuracy +0.063 to +0.153, macro-F1 +0.034 to +0.123 (95% intervals, both exclude 0). Numbers: [`results/final_r2_metrics.json`](results/final_r2_metrics.json).
 
-### ROC Curves
-![ROC Curves](results/roc_curves.png)
+Read these numbers with care:
+- **The bias is a trade-off, not free accuracy.** It shifts predictions towards rare classes: balanced accuracy rises from 0.770 to 0.819 while plain accuracy falls from 0.850 to 0.837 (nevus sensitivity 0.88). Its effect was checked by lesion-disjoint cross-fitting inside the validation set (balanced accuracy 0.716 to 0.763 on the held-out half).
+- **The test set was looked at twice**: once for the v2.0 baselines and once for this ensemble, whose configuration was fixed beforehand (`scripts/final_eval_r2.py` refuses a second run). Every further change must be judged on validation.
+- **The demo runs 4 of the 5 members.** One member (from the first sweep) was not kept as a weights file, so the reported ensemble cannot be re-run exactly; the 4-member ensemble in `models/ensemble/` was not scored on the test set.
+- Rare classes are small in the test set (dermatofibroma 17 images, vascular lesions 21), so their per-class numbers are wide.
+- **Melanoma is still missed about once in four** (sensitivity 0.72).
 
-### Preprocessing — Hair Removal
-![Hair Removal Demo](results/hair_removal_demo.png)
+### Baselines (v2.0.0)
 
-> 📂 All result files are documented in [`results/README.md`](results/README.md)
+Evaluated once on the same test set. Full per-class tables: [`results/metrics.md`](results/metrics.md).
 
----
+| Model | Accuracy | Macro-F1 | Balanced acc. | Macro-AUC |
+|-------|----------|----------|---------------|-----------|
+| **ViT-B/16** | **0.806** [0.782, 0.830] | **0.710** [0.661, 0.751] | **0.712** [0.663, 0.761] | **0.955** [0.946, 0.964] |
+| EfficientNet-B3 | 0.741 [0.715, 0.765] | 0.612 [0.560, 0.655] | 0.653 [0.603, 0.704] | 0.934 [0.921, 0.945] |
 
-## Architecture Overview
+ViT-B/16 beats EfficientNet-B3 by 0.098 macro-F1 (95% CI [0.053, 0.151], paired bootstrap).
 
-```
-Input (3 × 224 × 224)
-        │
-        ▼
- ┌──────────────────────────────────────┐
- │  Hair Removal (Black-Hat + TELEA)    │  preprocess.py
- └──────────────────────────────────────┘
-        │
-        ▼
- ┌──────────────────────────────────────┐
- │  Data Augmentation (train only)      │  dataset.py
- │  HFlip · VFlip · Rotate · ColorJitter│
- └──────────────────────────────────────┘
-        │
-   ┌────┴────┐
-   ▼         ▼
-EfficientNet-B3        ViT-B/16
-(timm pretrained)      (timm pretrained)
-     │                      │
- Global Avg Pool        CLS Token (768-d)
-  (1536-d)                  │
-     │               LayerNorm(768)
- Dropout(0.4)               │
-     │               Dropout(0.4)
- Linear(→256)         Linear(→256)
- BatchNorm1d(256)      GELU
- ReLU                       │
- Dropout(0.3)         Dropout(0.3)
-     │                      │
- Linear(→7)          Linear(→7)
-   ▲                      ▲
-   └──────────────────────┘
-             │
-      Focal Loss (γ=2.0)
-      AdamW + ReduceLROnPlateau
-```
+Melanoma (ViT-B/16): sensitivity **0.673** [0.574, 0.764], specificity 0.907 [0.889, 0.924].
 
----
+![Model comparison](results/model_comparison.png)
+![Training history](results/training_history.png)
 
-## Dataset
+| ViT-B/16 confusion matrix | ViT-B/16 ROC |
+|---|---|
+| ![](results/confusion_matrix_vit_b16.png) | ![](results/roc_curves_vit_b16.png) |
 
-**HAM10000** — Human Against Machine with 10,000 training images.
+EfficientNet-B3 plots and per-class sensitivity/specificity charts are in [`results/`](results/README.md).
 
-| Class | Code | Count | Description |
-|-------|------|-------|-------------|
-| Melanocytic Nevi | nv | 6,705 | Benign mole |
-| Melanoma | mel | 1,113 | Malignant |
-| Benign Keratosis | bkl | 1,099 | SK / LPLK / SE |
-| Basal Cell Carcinoma | bcc | 514 | Common skin cancer |
-| Actinic Keratoses | akiec | 327 | Pre-malignant |
-| Vascular Lesions | vasc | 142 | Angioma etc. |
-| Dermatofibroma | df | 115 | Benign fibrous |
+### How the ensemble was found
 
-**Source:** Tschandl, P., Rosendahl, C. & Kittler, H. (2018).  
-*The HAM10000 dataset, a large collection of multi-source dermatoscopic images of common pigmented skin lesions.*  
-Scientific Data **5**, 180161. DOI: [10.7910/DVN/DBW86T](https://doi.org/10.7910/DVN/DBW86T)
+Validation-only results of the two sweeps ([`kaggle/r1`](kaggle/r1/train.py), [`kaggle/r2`](kaggle/r2/train.py), all trained on Kaggle T4 GPUs on the same lesion-grouped split):
 
-> [!NOTE]
-> **Clinical Methodology & Data Leakage Isolation**: In dermoscopic datasets, HAM10000 contains multiple images for certain lesions. While baseline stratification splits on `dx` (diagnosis), clinical zero-leakage evaluation recommends `StratifiedGroupKFold` grouped by `lesion_id` to guarantee that multi-view images of the same patient/lesion remain strictly isolated within either training or testing folds.
+| Run | Val. accuracy | Val. macro-F1 | Val. AUC |
+|---|---|---|---|
+| ViT-B/16 224 (v2.0 pipeline) | 0.812 | 0.684 | 0.955 |
+| ViT-B/16 384 | 0.818 | 0.709 | 0.953 |
+| EfficientNet-B3 384 | 0.717 | 0.653 | 0.944 |
+| ConvNeXt-S 384 (R1) | 0.854 | 0.743 | 0.971 |
+| ConvNeXt-S 384, seed 42 / 7 (R2, +TTA) | 0.847 / 0.832 | 0.761 / 0.723 | 0.973 / 0.972 |
+| ConvNeXt-S 448, seed 42 / 7 (R2, +TTA) | 0.853 / 0.857 | 0.783 / 0.740 | 0.975 / 0.971 |
 
-**Download:**
-```bash
-# Option A — Kaggle CLI
-pip install kaggle
-kaggle datasets download -d kmader/skin-lesion-analysis-toward-melanoma-detection
-unzip skin-lesion-analysis-toward-melanoma-detection.zip -d data/raw/
+- **Higher resolution and a ConvNeXt backbone helped** more than anything else.
+- **Metadata (age, sex, lesion site) did not help**: macro-F1 fell from 0.709 to 0.700 (ViT) and from 0.743 to 0.717 (ConvNeXt) when added.
+- **Seed noise is large**: the same configuration varied by up to 0.06 in validation balanced accuracy and 0.2 in melanoma sensitivity, so single-run rankings are unreliable; ensembling and bias tuning were judged on lesion-resampled validation data.
+- Not tried: external datasets (ISIC 2019 contains HAM10000 images and would need careful de-duplication).
 
-# Option B — Harvard Dataverse
-# https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/DBW86T
-```
+## Evaluation methodology
 
-Expected directory structure inside `data/raw/`:
-```
-data/raw/
-├── HAM10000_metadata.csv
-├── HAM10000_images_part_1/   (5000 × .jpg)
-└── HAM10000_images_part_2/   (5015 × .jpg)
-```
+- **Lesion-grouped split.** HAM10000 has several photos of many lesions. Splitting by image leaks near-duplicates between train and test and inflates scores. Here all images of a `lesion_id` go to one split: 70/15/15 over 7,470 lesions (`StratifiedGroupKFold`, seed 42), 7,009 / 1,503 / 1,503 images. The assignment is committed in [`results/splits.csv`](results/splits.csv).
+- **Model selection on validation only.** The best epoch is chosen by validation macro-F1 (ViT-B/16: epoch 26, early stop at 33).
+- **Test-set use.** v2.0: used once, after selection, for the two baselines (`results/*_test_predictions.csv`). v2.1: used once more for the fixed ensemble (see above). Nothing was selected or tuned on it.
+- **Confidence intervals.** `scripts/report.py` recomputes every number from those CSVs and resamples at the lesion level, so repeated images of a lesion do not shrink the intervals.
+- **Earlier numbers retracted.** Earlier versions of this repo reported 94.2% accuracy. Those figures came from a notebook that was not reproducible; they were replaced by the results above in v2.0.0.
 
----
+## Limitations
 
-## Installation
+- **Single dataset.** HAM10000 only (one source population, dermoscopy). No external validation; performance on other devices, skin types or clinics is unknown.
+- **Class imbalance.** 67% of images are nevi. Rare classes have few test lesions (vascular 21, dermatofibroma 17 images), so their estimates are wide.
+- **Melanoma sensitivity is 72%** for the v2.1 ensemble (ViT-B/16: 67%, EfficientNet-B3: 53%): roughly one melanoma in four is still missed.
+- **Not clinically validated.** No prospective study, no clinician comparison, no calibration analysis. Do not use it for diagnosis or triage.
+
+## Demo
+
+`app.py` is a Gradio app that runs the 4-model ConvNeXt-S ensemble in `models/ensemble/` (hair removal, 384/448 px resize, ImageNet normalisation, flip TTA, class bias; same preprocessing as training) and shows the top-3 class probabilities, with example images from `data/samples/`. On a CPU one image takes roughly 10 seconds (measured at 1.8 s per member at 384 px). The ensemble weights (about 190 MB each) are not stored in git; `models/ensemble/ensemble_config.json` describes them. The v2.0 single-model path remains available via `python demo.py --weights ... `.
 
 ```bash
-# 1. Clone the repository
+pip install -r requirements.txt
+export MODEL_PATH=/path/to/best_vit_b16.pth   # optional (Windows: set MODEL_PATH=...)
+python app.py                                  # http://127.0.0.1:7860
+python demo.py --image data/samples/sample_mel.jpg   # command-line version
+```
+
+Ensemble weights: `ENSEMBLE_DIR` if set, otherwise `models/ensemble/`, otherwise downloaded from the Hugging Face model repo `Yasir-Alazmi/skin-lesion-convnext-ensemble` (`ENSEMBLE_REPO` overrides). Legacy single-model weights: `MODEL_PATH`, or the repo `Yasir-Alazmi/skin-lesion-vit-b16`. Checkpoints are not stored in git.
+
+### Hugging Face Space
+
+The front-matter at the top of this README configures a `sdk: gradio` Space. To deploy: (1) upload the four `models/ensemble/*.pt` files and `ensemble_config.json` to a model repo `Yasir-Alazmi/skin-lesion-convnext-ensemble` (the older ViT-B/16 export is `scripts/export_weights.py`); (2) create a Gradio Space and push this repository's files (`app.py`, `src/`, `data/samples/`, `requirements.txt`, `README.md`); the app downloads the weights on first start.
+
+## Reproduce
+
+```bash
 git clone https://github.com/Yasir-Alazmi/skin-lesion-classification.git
 cd skin-lesion-classification
-
-# 2. Create and activate a virtual environment (recommended)
-python -m venv venv
-# Windows
-venv\Scripts\activate
-# macOS / Linux
-source venv/bin/activate
-
-# 3. Install dependencies
+python -m venv .venv && .venv\Scripts\activate      # Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt
+
+# 1. Download HAM10000 (Harvard Dataverse, DOI 10.7910/DVN/DBW86T) into <DataRoot>/raw/:
+#    HAM10000_metadata.csv, HAM10000_images_part_1/, HAM10000_images_part_2/
+
+# 2. Train both models on the committed split (Windows PowerShell), then evaluate each
+#    best-validation checkpoint once on the test set
+powershell -ExecutionPolicy Bypass -File scripts\train_all.ps1 -DataRoot D:\skin-lesion-data
+powershell -File scripts\train_status.ps1           # progress
+
+# 3. Copy <DataRoot>\runs\<model>\test_predictions.csv to results/{vit,efficientnet}_test_predictions.csv
+#    and history.json to results/history_{vit_b16,efficientnet_b3}.json, then:
+python scripts/report.py                            # writes results/metrics.{json,md} and figures
+pytest tests/ -v
 ```
 
-> **CUDA:** The project was developed with CUDA 12.1 + cuDNN 8.9 on an NVIDIA RTX 3090.
-> Verify your CUDA version before installing PyTorch:
----
+Training uses focal loss (gamma 2), AdamW (lr 1e-4), a frozen backbone for the first 5 epochs, ReduceLROnPlateau, a weighted sampler and early stopping on validation macro-F1. Seed 42 everywhere (`src/config.py`).
 
-## ⚡ Quickstart — 60-Second Zero-Friction Demo
-
-Run inference instantly on bundled sample dermoscopic images without downloading the full 2.6GB HAM10000 dataset:
-
-```bash
-# 1. Run CLI Inference on sample image (CPU, ~1.1s)
-python demo.py --image data/samples/sample_melanocytic_nevus.jpg --model vit
-
-# Or test EfficientNet-B3 (ultra-fast, ~230ms on CPU)
-python demo.py --image data/samples/sample_vascular_lesion.jpg --model efficientnet
-
-# 2. Launch Interactive Gradio Web UI
-pip install gradio
-python app.py
-```
-
----
-
-## Usage
-
-### Training
-
-```bash
-# Train EfficientNet-B3
-python -m src.train --model efficientnet
-
-# Train ViT-B/16
-python -m src.train --model vit
-
-# Custom hyper-parameters
-python -m src.train \
-  --model vit \
-  --epochs 40 \
-  --batch-size 16 \
-  --lr 5e-5
-```
-
-Or directly from Python:
-```python
-import pandas as pd
-from src.config import HAM_METADATA_CSV, DEVICE
-from src.models import build_vit
-from src.dataset import build_loaders
-from src.loss import FocalLoss
-from src.train import train_model
-
-df = pd.read_csv(HAM_METADATA_CSV)
-train_loader, val_loader, test_loader = build_loaders(df)
-
-model = build_vit(num_classes=7, pretrained=True)
-criterion = FocalLoss(gamma=2.0).to(DEVICE)
-
-history = train_model(
-    model, train_loader, val_loader,
-    model_name="ViT-B/16",
-    num_epochs=30,
-    criterion=criterion,
-)
-```
-
-### Evaluation
-
-```python
-from src.config import DEVICE, CLASS_NAMES
-from src.models import build_vit
-from src.evaluate import full_evaluation
-from src.loss import FocalLoss
-import torch
-
-# Load checkpoint
-model = build_vit(num_classes=7, pretrained=False)
-ckpt = torch.load("models/checkpoints/best_vit_b16.pth", map_location=DEVICE)
-model.load_state_dict(ckpt["model_state_dict"])
-model = model.to(DEVICE)
-
-criterion = FocalLoss(gamma=2.0)
-results = full_evaluation(model, test_loader, criterion, CLASS_NAMES, DEVICE)
-```
-
-### Visualisation
-
-```python
-from src.visualize import (
-    plot_training_history,
-    plot_confusion_matrix,
-    plot_roc_curves,
-    plot_model_comparison,
-)
-
-plot_training_history(eff_history, vit_history)
-plot_confusion_matrix(results["confusion_matrix"], CLASS_NAMES, "ViT-B/16")
-plot_roc_curves(results, CLASS_NAMES, "ViT-B/16")
-plot_model_comparison(eff_results, vit_results)
-```
-
-All plots are saved to `outputs/`.
-
----
-
-## Key Methods
-
-| Component | Implementation | Details |
-|-----------|---------------|---------|
-| Hair Removal | Black-Hat morphology + TELEA inpainting | `cv2.MORPH_BLACKHAT`, kernel=17, radius=6 |
-| Class Imbalance | Focal Loss + WeightedRandomSampler | γ=2.0, inverse-frequency sampling |
-| Data Split | Stratified 70/15/15 | `sklearn.model_selection.train_test_split` |
-| Backbone | EfficientNet-B3 / ViT-B/16 | `timm` pretrained on ImageNet |
-| Optimiser | AdamW | lr=1e-4, weight_decay=1e-4 |
-| LR Scheduling | ReduceLROnPlateau | factor=0.5, patience=3, min=1e-7 |
-| Fine-tuning | 2-phase: freeze → unfreeze at epoch 5 | backbone lr=1e-5 (×0.1) |
-| Regularisation | Dropout 0.4 / 0.3 + gradient clipping | max_norm=1.0 |
-| Early Stopping | Patience=7 on val AUC | min_delta=1e-4 |
-
----
-
-## Hardware & Reproducibility
-
-| Item | Value |
-|------|-------|
-| GPU | NVIDIA RTX 3090 (24 GB VRAM) |
-| CUDA | 12.1 |
-| Framework | PyTorch 2.1.0 + torchvision 0.16.0 |
-| timm | 0.9.12 |
-| Random Seed | 42 |
-| Determinism | `torch.backends.cudnn.deterministic = True` |
-| OS | Ubuntu 22.04 / Windows 11 |
-
-All random seeds are fixed in `src/config.py` via `set_seed(42)`.
-
----
-
-## Project Structure
+## Project structure
 
 ```
-skin-lesion-classification/
-├── src/
-│   ├── config.py          # Constants, seeds, paths
-│   ├── preprocess.py      # Hair removal (Black-Hat + TELEA)
-│   ├── dataset.py         # HAMDataset, transforms, stratified splits
-│   ├── loss.py            # FocalLoss, WeightedRandomSampler
-│   ├── models.py          # build_efficientnet(), build_vit()
-│   ├── train.py           # train_model(), EarlyStopping
-│   ├── evaluate.py        # full_evaluation() with per-class metrics
-│   └── visualize.py       # All plotting utilities
-├── notebooks/
-│   └── ham10000_vit_vs_efficientnet.ipynb
-├── data/
-│   ├── raw/               # gitignored — place HAM10000 images here
-│   └── processed/         # gitignored — preprocessed cache
-├── models/
-│   └── checkpoints/       # gitignored — .pth files saved here
-├── outputs/               # gitignored — saved PNGs + CSVs
-├── docs/
-│   └── paper.pdf
-├── requirements.txt
-├── .gitignore
-└── README.md
+app.py, demo.py        Gradio demo and CLI (real model inference)
+src/                   config, split, dataset, preprocess, models, loss, train, evaluate, visualize, inference
+scripts/               train_all.ps1, train_status.ps1, report.py, export_weights.py, final_eval_r2.py
+kaggle/                r1, r2: Kaggle training scripts for the ConvNeXt sweeps (2 x T4)
+models/ensemble/       ensemble_config.json (tracked); member weights (.pt, ignored)
+results/               splits.csv, test predictions, metrics.{json,md}, figures
+tests/                 CPU-only tests (no dataset or checkpoint needed)
+data/samples/          example images for the demo
 ```
 
----
+## Data and citation
 
-## Citation
+HAM10000: Tschandl, Rosendahl & Kittler (2018), *Scientific Data* 5, 180161, [doi:10.1038/sdata.2018.161](https://doi.org/10.1038/sdata.2018.161) (CC BY-NC 4.0). Hair removal: Black-Hat morphology + TELEA inpainting (Telea, 2004). Loss: Lin et al., Focal Loss (ICCV 2017).
 
-If you use this code, please cite the HAM10000 dataset:
-
-```bibtex
-@article{tschandl2018ham10000,
-  title   = {The HAM10000 dataset, a large collection of multi-source
-             dermatoscopic images of common pigmented skin lesions},
-  author  = {Tschandl, Philipp and Rosendahl, Cliff and Kittler, Harald},
-  journal = {Scientific Data},
-  volume  = {5},
-  pages   = {180161},
-  year    = {2018},
-  doi     = {10.1038/sdata.2018.161}
-}
-```
-
-And the focal loss paper:
-
-```bibtex
-@inproceedings{lin2017focal,
-  title     = {Focal Loss for Dense Object Detection},
-  author    = {Lin, Tsung-Yi and Goyal, Priya and Girshick, Ross and
-               He, Kaiming and Doll{\'a}r, Piotr},
-  booktitle = {ICCV},
-  year      = {2017}
-}
-```
-
----
-
-## Contributing
-
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to submit pull requests, report issues, and set up the development environment.
-
----
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for a full history of changes.
-
----
-
-## License
-
-This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for details.
+See [CHANGELOG.md](CHANGELOG.md) and [CONTRIBUTING.md](CONTRIBUTING.md). License: MIT.

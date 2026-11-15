@@ -14,7 +14,8 @@ Functions
 get_transforms(split)
     Returns the appropriate torchvision transform pipeline.
 get_splits(df, seed)
-    Produces stratified train / val / test DataFrames (70 / 15 / 15 %).
+    Produces lesion-grouped, class-stratified train / val / test DataFrames
+    (70 / 15 / 15 %); see ``src/split.py``.
 build_loaders(df, seed, batch_size, num_workers, apply_hair_removal)
     Returns (train_loader, val_loader, test_loader) ready for training.
 """
@@ -33,6 +34,7 @@ from PIL import Image
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 
+from src.cache import ImageCache
 from src.config import (
     HAM_IMAGES_DIR_1,
     HAM_IMAGES_DIR_2,
@@ -41,10 +43,12 @@ from src.config import (
     IMG_SIZE,
     LABEL_MAP,
     SEED,
+    SPLITS_CSV,
     TRAIN_RATIO,
     VAL_RATIO,
 )
 from src.preprocess import read_image_bgr, remove_hair
+from src.split import make_lesion_split, split_frames
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Transform pipelines
@@ -120,6 +124,9 @@ class HAMDataset(Dataset):
     image_dirs : list of str, optional
         Directories to search for image files.  Defaults to the two standard
         HAM10000 image folders defined in ``config.py``.
+    cache : ImageCache, optional
+        Pre-computed (hair-removed, resized) images from ``src/cache.py``.  When
+        given, images are read from it and ``apply_hair_removal`` is ignored.
 
     Item  shape
     -----------
@@ -133,6 +140,7 @@ class HAMDataset(Dataset):
         transform: Optional[T.Compose] = None,
         apply_hair_removal: bool = True,
         image_dirs: Optional[list[str]] = None,
+        cache: Optional[ImageCache] = None,
     ) -> None:
         self.df = dataframe.reset_index(drop=True)
         self.transform = transform if transform is not None else get_transforms("val")
@@ -143,6 +151,7 @@ class HAMDataset(Dataset):
             image_dirs = [HAM_IMAGES_DIR_1, HAM_IMAGES_DIR_2]
         self.image_dirs = [Path(d) for d in image_dirs if os.path.isdir(d)]
 
+        self.cache = cache
         self._path_cache: dict[str, Path] = {}
 
     # ── helpers ───────────────────────────────────────────────────────────────
@@ -170,6 +179,9 @@ class HAMDataset(Dataset):
         image_id: str = row["image_id"]
         label: int = LABEL_MAP[row["dx"]]
 
+        if self.cache is not None:
+            return self.transform(self.cache.get(image_id)), label
+
         # Load image via Unicode-safe BGR reader then convert to RGB PIL
         path = self._find_image(image_id)
         img_bgr = read_image_bgr(path)
@@ -188,7 +200,7 @@ class HAMDataset(Dataset):
     @property
     def labels(self) -> list[int]:
         """All integer labels in dataset order (used by WeightedRandomSampler)."""
-        return [LABEL_MAP[row["dx"]] for _, row in self.df.iterrows()]
+        return [LABEL_MAP[dx] for dx in self.df["dx"]]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -202,58 +214,39 @@ def get_splits(
     group_by_lesion: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
-    Stratified 70 / 15 / 15 train / val / test split.
+    70 / 15 / 15 train / val / test split.
 
-    When ``group_by_lesion=True`` and ``lesion_id`` is present in the DataFrame,
-    ``StratifiedGroupKFold`` is employed to prevent clinical data leakage:
-    all images belonging to the same patient/lesion remain strictly isolated within
-    either the training, validation, or testing fold.
+    With ``group_by_lesion=True`` (default) every ``lesion_id`` lands in exactly one
+    split and classes are stratified at lesion level (``src/split.py``).  The
+    image-level fallback (``group_by_lesion=False``) leaks near-duplicate images of
+    one lesion across splits and exists only to reproduce the original, flawed
+    protocol; do not use it for reported results.
 
     Parameters
     ----------
     df : pd.DataFrame
-        Full metadata DataFrame. Must contain a ``dx`` column.
+        Full metadata DataFrame with ``image_id``, ``lesion_id`` and ``dx``.
     seed : int
         Random state for reproducibility.
     group_by_lesion : bool, default=True
-        Whether to enforce lesion-level grouping to eliminate clinical data leakage.
 
     Returns
     -------
     (train_df, val_df, test_df) : tuple of pd.DataFrame
     """
-    if group_by_lesion and "lesion_id" in df.columns:
-        from sklearn.model_selection import StratifiedGroupKFold
+    if group_by_lesion:
+        if "lesion_id" not in df.columns:
+            raise ValueError("lesion_id column is required for a lesion-grouped split")
+        merged = df.merge(make_lesion_split(df, seed=seed)[["image_id", "split"]], on="image_id")
+        return split_frames(merged)
 
-        sgkf = StratifiedGroupKFold(n_splits=7, shuffle=True, random_state=seed)
-        splits = list(sgkf.split(df, df["dx"], groups=df["lesion_id"]))
-
-        # Fold 0 -> test (~14.3%), Fold 1 -> val (~14.3%), Folds 2..6 -> train (~71.4%)
-        _, test_idx = splits[0]
-        _, val_idx = splits[1]
-        train_idx = [i for i in range(len(df)) if i not in set(test_idx) and i not in set(val_idx)]
-
-        train_df = df.iloc[train_idx]
-        val_df = df.iloc[val_idx]
-        test_df = df.iloc[test_idx]
-    else:
-        # Step 1: separate out test set (15 %)
-        train_val_df, test_df = train_test_split(
-            df,
-            test_size=TEST_RATIO,
-            stratify=df["dx"],
-            random_state=seed,
-        )
-
-        # Step 2: split the remainder into train (70 %) / val (15 %)
-        val_fraction = VAL_RATIO / (TRAIN_RATIO + VAL_RATIO)
-        train_df, val_df = train_test_split(
-            train_val_df,
-            test_size=val_fraction,
-            stratify=train_val_df["dx"],
-            random_state=seed,
-        )
-
+    train_val_df, test_df = train_test_split(
+        df, test_size=TEST_RATIO, stratify=df["dx"], random_state=seed
+    )
+    val_fraction = VAL_RATIO / (TRAIN_RATIO + VAL_RATIO)
+    train_df, val_df = train_test_split(
+        train_val_df, test_size=val_fraction, stratify=train_val_df["dx"], random_state=seed
+    )
     return (
         train_df.reset_index(drop=True),
         val_df.reset_index(drop=True),
@@ -270,6 +263,12 @@ TEST_RATIO = 1.0 - TRAIN_RATIO - VAL_RATIO
 # ──────────────────────────────────────────────────────────────────────────────
 
 
+def _head_per_class(frame: pd.DataFrame, n_total: int) -> pd.DataFrame:
+    """Small class-balanced subset (smoke tests only); keeps every class present."""
+    per_class = max(1, -(-n_total // frame["dx"].nunique()))
+    return frame.groupby("dx", sort=True).head(per_class).reset_index(drop=True)
+
+
 def build_loaders(
     df: pd.DataFrame,
     seed: int = SEED,
@@ -277,9 +276,18 @@ def build_loaders(
     num_workers: int = 4,
     apply_hair_removal: bool = True,
     use_weighted_sampler: bool = True,
-) -> tuple[DataLoader, DataLoader, DataLoader]:
+    splits_csv: Optional[str] = SPLITS_CSV,
+    cache_dir: Optional[str] = None,
+    smoke_n: Optional[int] = None,
+    gpu_pipeline: Optional[bool] = None,
+    device: Optional[torch.device] = None,
+) -> tuple:
     """
     Create train / val / test DataLoaders from the full metadata DataFrame.
+
+    The split is lesion-grouped and class-stratified.  When ``splits_csv`` is given
+    it is loaded (or created on first use) so the exact assignment is auditable
+    and identical across runs; a CSV that does not match ``df`` is rejected.
 
     The training loader uses ``WeightedRandomSampler`` by default to mitigate
     the class imbalance present in HAM10000 (~67 % nevi).
@@ -287,41 +295,67 @@ def build_loaders(
     Parameters
     ----------
     df : pd.DataFrame
-        Full HAM10000 metadata (image_id, dx, …).
+        Full HAM10000 metadata (image_id, lesion_id, dx, ...).
     seed : int
-        Seed forwarded to ``get_splits()``.
+        Seed for the split (only used when the CSV does not exist yet).
     batch_size : int
         Batch size for all loaders.
     num_workers : int
-        Dataloader worker processes.
+        Dataloader worker processes (persistent, so Windows spawn cost is paid once).
     apply_hair_removal : bool
-        Forwarded to ``HAMDataset``.
+        Forwarded to ``HAMDataset`` (ignored for images served from the cache).
     use_weighted_sampler : bool
         Use ``WeightedRandomSampler`` on the training set.
+    splits_csv : str or None
+        Path of the audited split CSV; ``None`` splits in memory without saving.
+    cache_dir : str or None
+        If it holds a cache built by ``src/cache.py`` it is used for all splits.
+    smoke_n : int or None
+        Debug only: class-balanced subset of about this many training images
+        (and half as many for val / test).
+    gpu_pipeline : bool or None
+        Serve batches from RAM with augmentation on ``device`` (``src/gpu_data.py``)
+        instead of multi-process DataLoaders.  ``None`` = on whenever the cache exists.
+    device : torch.device or None
+        Device of the GPU pipeline (default: CUDA if available).
 
     Returns
     -------
     (train_loader, val_loader, test_loader)
     """
     from src.loss import make_weighted_sampler  # local import avoids circularity
+    from src.split import load_or_create_splits
 
-    train_df, val_df, test_df = get_splits(df, seed=seed)
+    if splits_csv:
+        table = load_or_create_splits(df, splits_csv, seed=seed)
+    else:
+        table = make_lesion_split(df, seed=seed)
+    train_df, val_df, test_df = split_frames(table)
+    if smoke_n:
+        train_df = _head_per_class(train_df, smoke_n)
+        val_df = _head_per_class(val_df, max(smoke_n // 2, 7))
+        test_df = _head_per_class(test_df, max(smoke_n // 2, 7))
 
-    train_dataset = HAMDataset(
-        train_df,
-        transform=get_transforms("train"),
-        apply_hair_removal=apply_hair_removal,
-    )
-    val_dataset = HAMDataset(
-        val_df,
-        transform=get_transforms("val"),
-        apply_hair_removal=apply_hair_removal,
-    )
-    test_dataset = HAMDataset(
-        test_df,
-        transform=get_transforms("test"),
-        apply_hair_removal=apply_hair_removal,
-    )
+    cache = None
+    if cache_dir and ImageCache.exists(cache_dir, apply_hair_removal):
+        cache = ImageCache(cache_dir, apply_hair_removal)
+
+    def _ds(frame: pd.DataFrame, split: str) -> HAMDataset:
+        return HAMDataset(
+            frame,
+            transform=get_transforms(split),
+            apply_hair_removal=apply_hair_removal,
+            cache=cache,
+        )
+
+    if gpu_pipeline is None:
+        gpu_pipeline = cache is not None
+    if gpu_pipeline and cache is None:
+        raise ValueError("gpu_pipeline needs the image cache (src/cache.py)")
+
+    train_dataset = _ds(train_df, "train")
+    val_dataset = _ds(val_df, "val")
+    test_dataset = _ds(test_df, "test")
 
     sampler = None
     shuffle = True
@@ -329,27 +363,33 @@ def build_loaders(
         sampler = make_weighted_sampler(train_dataset.labels)
         shuffle = False  # mutually exclusive with sampler
 
+    if gpu_pipeline:
+        from src.gpu_data import GPUBatchLoader
+
+        dev = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        images = cache.load_all()
+
+        def _gpu(frame: pd.DataFrame, **kw) -> GPUBatchLoader:
+            labels = [LABEL_MAP[d] for d in frame["dx"]]
+            rows = [cache.row(i) for i in frame["image_id"]]
+            return GPUBatchLoader(images, rows, labels, frame, batch_size, dev, **kw)
+
+        return (
+            _gpu(train_df, train=True, sampler=sampler, drop_last=True),
+            _gpu(val_df),
+            _gpu(test_df),
+        )
+
+    common = dict(
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=torch.cuda.is_available(),
+        persistent_workers=num_workers > 0,
+    )
     train_loader = DataLoader(
-        train_dataset,
-        batch_size=batch_size,
-        sampler=sampler,
-        shuffle=shuffle,
-        num_workers=num_workers,
-        pin_memory=torch.cuda.is_available(),
+        train_dataset, sampler=sampler, shuffle=shuffle, drop_last=True, **common
     )
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=num_workers,
-        pin_memory=torch.cuda.is_available(),
-    )
-    test_loader = DataLoader(
-        test_dataset,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=num_workers,
-        pin_memory=torch.cuda.is_available(),
-    )
+    val_loader = DataLoader(val_dataset, shuffle=False, **common)
+    test_loader = DataLoader(test_dataset, shuffle=False, **common)
 
     return train_loader, val_loader, test_loader
