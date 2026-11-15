@@ -28,9 +28,11 @@ _EPS = 1e-6
 
 
 class ConvNeXtClassifier(nn.Module):
-    """Same layout as the Kaggle training script: ``backbone`` (no head) + dropout + linear ``head``."""
+    """Same layout as the Kaggle training script: backbone, dropout, linear head."""
 
-    def __init__(self, timm_model: str, num_classes: int = len(CLASS_NAMES), pretrained: bool = False):
+    def __init__(
+        self, timm_model: str, num_classes: int = len(CLASS_NAMES), pretrained: bool = False
+    ):
         super().__init__()
         import timm
 
@@ -43,7 +45,7 @@ class ConvNeXtClassifier(nn.Module):
 
 
 def combine_log_probs(member_probs: Sequence[np.ndarray], bias: np.ndarray) -> np.ndarray:
-    """Mean of log-probabilities over members, plus class bias, then softmax. Inputs: (C,) arrays."""
+    """Mean log-probability over members plus class bias, then softmax. Inputs are (C,) arrays."""
     logs = np.mean([np.log(np.clip(p, _EPS, 1.0)) for p in member_probs], axis=0) + np.asarray(bias)
     e = np.exp(logs - logs.max())
     return e / e.sum()
