@@ -23,7 +23,10 @@ pytest tests/test_smoke.py -v
 
 | File | Description |
 |------|-------------|
-| `test_smoke.py` | Smoke tests — imports, FocalLoss forward pass, model output shapes |
+| `test_smoke.py` | Imports, FocalLoss forward pass, model output shapes |
+| `test_split.py`, `test_gpu_data.py`, `test_train_loop.py` | Lesion-grouped split, GPU data path, training loop |
+| `test_demo.py` | Inference path (preprocess, top-3, weight loading) with a tiny stand-in model |
+| `test_core.py`, `test_report.py` | Preprocessing, early stopping, metric/bootstrap helpers |
 
 ---
 

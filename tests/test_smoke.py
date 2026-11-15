@@ -1,7 +1,6 @@
 """Basic smoke tests — no GPU or dataset required."""
 
 import importlib
-import sys
 import types
 
 
@@ -77,9 +76,9 @@ def test_get_splits_stratified_group_leakage_isolation():
     # Create synthetic metadata with duplicate lesion_ids (patient-level clustering)
     records = []
     classes = ["nv", "mel", "bkl", "bcc", "akiec", "vasc", "df"]
-    for i in range(140):
-        cls = classes[i % len(classes)]
-        lesion = f"LESION_{i // 2:03d}"  # 2 images per lesion
+    for i in range(1400):
+        cls = classes[(i // 2) % len(classes)]  # one diagnosis per lesion
+        lesion = f"LESION_{i // 2:04d}"  # 2 images per lesion
         records.append({"image_id": f"IMG_{i:04d}", "lesion_id": lesion, "dx": cls})
     df = pd.DataFrame(records)
 

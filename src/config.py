@@ -114,16 +114,35 @@ TEST_RATIO: float = 0.15  # Implicit: 1 - TRAIN_RATIO - VAL_RATIO
 _SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(_SRC_DIR)
 
+# Optional external data root.  When the environment variable SKIN_DATA_DIR is set,
+# the raw dataset, image cache, checkpoints and logs all live under it (outside git):
+#   <SKIN_DATA_DIR>/raw  /cache  /checkpoints  /logs  /runs
+_EXTERNAL_ROOT = os.environ.get("SKIN_DATA_DIR")
+
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
-RAW_DATA_DIR = os.path.join(DATA_DIR, "raw")
-PROCESSED_DATA_DIR = os.path.join(DATA_DIR, "processed")
+RAW_DATA_DIR = os.path.join(_EXTERNAL_ROOT or DATA_DIR, "raw")
+PROCESSED_DATA_DIR = os.path.join(_EXTERNAL_ROOT or DATA_DIR, "processed")
+CACHE_DIR = os.path.join(_EXTERNAL_ROOT or DATA_DIR, "cache")
 
 MODELS_DIR = os.path.join(PROJECT_ROOT, "models")
-CHECKPOINTS_DIR = os.path.join(MODELS_DIR, "checkpoints")
+CHECKPOINTS_DIR = (
+    os.path.join(_EXTERNAL_ROOT, "checkpoints")
+    if _EXTERNAL_ROOT
+    else os.path.join(MODELS_DIR, "checkpoints")
+)
 
 OUTPUTS_DIR = os.path.join(PROJECT_ROOT, "outputs")
+LOGS_DIR = (
+    os.path.join(_EXTERNAL_ROOT, "logs") if _EXTERNAL_ROOT else os.path.join(OUTPUTS_DIR, "logs")
+)
+RUNS_DIR = (
+    os.path.join(_EXTERNAL_ROOT, "runs") if _EXTERNAL_ROOT else os.path.join(OUTPUTS_DIR, "runs")
+)
 NOTEBOOKS_DIR = os.path.join(PROJECT_ROOT, "notebooks")
 DOCS_DIR = os.path.join(PROJECT_ROOT, "docs")
+
+# Audited lesion-grouped split (image_id, lesion_id, dx, split); committed to git.
+SPLITS_CSV = os.path.join(PROJECT_ROOT, "results", "splits.csv")
 
 # Convenience: paths to specific dataset artefacts inside RAW_DATA_DIR
 HAM_METADATA_CSV = os.path.join(RAW_DATA_DIR, "HAM10000_metadata.csv")

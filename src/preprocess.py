@@ -210,52 +210,6 @@ def extract_abcd_features(image_bgr: np.ndarray) -> dict[str, Any]:
     }
 
 
-def compute_calibrated_probabilities(
-    clean_bgr: np.ndarray,
-    abcd: dict[str, Any] | None = None,
-    model_key: str = "vit",
-) -> np.ndarray:
-    """
-    Compute deterministic, ABCD-calibrated 7-class HAM10000 probabilities
-    (order in config.CLASS_NAMES: 0:nv, 1:mel, 2:bkl, 3:bcc, 4:akiec, 5:vasc, 6:df)
-    when local .pth weights are absent.
-    """
-    if abcd is None:
-        abcd = extract_abcd_features(clean_bgr)
-
-    r, g, b = abcd["mean_rgb"]
-    asym = abcd["asymmetry"] / 100.0
-    bord = abcd["border_irregularity"] / 100.0
-    cz = abcd["color_zones"] / 6.0
-    struct = abcd["structure_score"] / 100.0
-
-    redness = (r - g) / max(1.0, r + g)
-    darkness = 1.0 - (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
-    blue_veil = (b - g) / max(1.0, b + g)
-
-    # Order in config.CLASS_NAMES:
-    # 0: nv, 1: mel, 2: bkl, 3: bcc, 4: akiec, 5: vasc, 6: df
-    logits = np.array(
-        [
-            2.1 * (1.0 - asym) * (1.0 - bord) + 0.8 * darkness - 0.8 * redness,  # 0: nv
-            1.6 * darkness + 1.5 * asym + 1.2 * cz + 0.9 * blue_veil,  # 1: mel
-            1.1 * darkness + 0.9 * struct + 0.4 * cz - 0.5 * redness,  # 2: bkl
-            1.2 * redness + 1.1 * cz + 0.7 * bord - 0.4 * darkness,  # 3: bcc
-            0.9 * redness + 1.1 * bord + 0.8 * struct - 0.6 * darkness,  # 4: akiec
-            3.2 * redness - 1.1 * darkness + 0.5 * (1.0 - bord),  # 5: vasc
-            0.8 * (1.0 - asym) + 0.7 * struct - 0.5 * cz,  # 6: df
-        ],
-        dtype=np.float64,
-    )
-
-    temp = 0.34 if model_key == "vit" else 0.42
-    scaled = logits / temp
-    scaled -= np.max(scaled)
-    exp_scores = np.exp(scaled)
-    probs = exp_scores / np.sum(exp_scores)
-    return probs.astype(np.float32)
-
-
 def preprocess_image(
     image_path: str | Path,
     apply_hair_removal: bool = True,

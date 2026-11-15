@@ -1,10 +1,18 @@
 """
-app.py — Interactive Gradio Web Demo for Skin Lesion Classification
-===================================================================
-Deployable to Hugging Face Spaces or run locally via `python app.py`.
-Compares Vision Transformer (ViT-B/16) and EfficientNet-B3 with Black-Hat
-morphological hair removal, TELEA inpainting, ROI segmentation, Grad-CAM /
-Attention saliency overlays, and Stolz ABCD clinical telemetry.
+app.py -- Gradio research demo for the ConvNeXt-S ensemble skin-lesion classifier
+================================================================================
+Runs the real models (no simulated outputs) on an uploaded dermoscopic image: hair removal ->
+resize (384 / 448) -> ImageNet norm -> flip TTA -> log-prob average + class bias.
+Shows the top-3 class probabilities of the 7 HAM10000 classes.
+
+Ensemble weights resolution (first that works):
+  1. ``ENSEMBLE_DIR`` environment variable (directory with ensemble_config.json + .pt files),
+  2. the repo directory ``models/ensemble/``,
+  3. Hugging Face Hub: ``ENSEMBLE_REPO`` (default ``Yasir-Alazmi/skin-lesion-convnext-ensemble``).
+The older single ViT-B/16 path (``resolve_weights``, used by ``demo.py --weights``) is kept.
+
+Run locally:  python app.py        Deploy: see "Hugging Face Space" in README.md.
+RESEARCH DEMO ONLY -- not a medical device, not clinically validated.
 """
 
 from __future__ import annotations
@@ -13,197 +21,110 @@ import os
 import sys
 from pathlib import Path
 
-try:
-    import spaces
-
-    gpu_decorator = spaces.GPU(duration=20)
-except ImportError:
-
-    def gpu_decorator(fn):
-        return fn
-
-
-import cv2
 import numpy as np
-import torch
-import torch.nn.functional as F
-from PIL import Image
-from torchvision import transforms
 
-# Ensure repository root is on sys.path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.config import (
-    CLASS_NAMES,
-    EFFICIENTNET_CKPT,
-    IDX_TO_LABEL,
-    IMAGENET_MEAN,
-    IMAGENET_STD,
-    VIT_CKPT,
-    set_seed,
+from src.config import VIT_CKPT  # noqa: E402
+from src.ensemble import DEFAULT_DIR, load_ensemble  # noqa: E402
+from src.inference import load_model, predict_probs, top_k  # noqa: E402
+
+MODEL_REPO = os.environ.get("MODEL_REPO", "Yasir-Alazmi/skin-lesion-vit-b16")
+MODEL_FILENAME = os.environ.get("MODEL_FILENAME", "best_vit_b16.pth")
+ENSEMBLE_REPO = os.environ.get("ENSEMBLE_REPO", "Yasir-Alazmi/skin-lesion-convnext-ensemble")
+SAMPLES_DIR = Path(__file__).parent / "data" / "samples"
+EXAMPLES = ["nv", "mel", "bkl", "bcc", "akiec", "vasc", "df"]
+
+DISCLAIMER = (
+    "**Research demo, not a medical device.** This model was trained on HAM10000 only and "
+    "has not been clinically validated. On held-out data it detects about 72% of melanomas, "
+    "so roughly one in four is missed and a wrong or reassuring answer is likely. Never use it to make or delay a medical "
+    "decision; see a clinician for any skin concern."
 )
-from src.models import build_efficientnet, build_vit
-from src.preprocess import (
-    compute_calibrated_probabilities,
-    extract_abcd_features,
-    remove_hair_with_mask,
-)
-from src.visualize import generate_saliency_overlay
 
-# Lazy-loaded model cache
-MODELS: dict[str, tuple[torch.nn.Module, bool]] = {}
+_MODEL = None
+_ENSEMBLE = None
 
 
-def get_model(model_choice: str) -> tuple[torch.nn.Module, bool]:
-    key = "vit" if "ViT" in model_choice else "efficientnet"
-    if key not in MODELS:
-        set_seed(42)
-        if key == "efficientnet":
-            m = build_efficientnet(num_classes=7, pretrained=False)
-            ckpt_path = EFFICIENTNET_CKPT
-        else:
-            m = build_vit(num_classes=7, pretrained=False)
-            ckpt_path = VIT_CKPT
-
-        has_ckpt = False
-        if os.path.exists(ckpt_path):
-            state = torch.load(ckpt_path, map_location="cpu")
-            m.load_state_dict(state.get("model_state_dict", state))
-            has_ckpt = True
-
-        m.eval()
-        MODELS[key] = (m, has_ckpt)
-    return MODELS[key]
-
-
-@gpu_decorator
-def classify_lesion(
-    image: np.ndarray,
-    model_choice: str = "Vision Transformer (ViT-B/16)",
-    kernel_size: int = 17,
-    threshold: int = 10,
-):
-    if image is None:
-        return None, None, None, {}, ""
-
-    # 1. Hair Removal Preprocessing + Mask Telemetry
-    img_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-    clean_bgr, _, occlusion_pct = remove_hair_with_mask(
-        img_bgr,
-        kernel_size=int(kernel_size),
-        threshold=int(threshold),
-        inpaint_radius=6,
-    )
-    clean_rgb = cv2.cvtColor(clean_bgr, cv2.COLOR_BGR2RGB)
-
-    # 2. Lesion ROI Segmentation & ABCD Biomarkers
-    abcd = extract_abcd_features(clean_bgr)
-    contour_rgb = cv2.cvtColor(abcd["contour_bgr"], cv2.COLOR_BGR2RGB)
-    saliency_rgb = generate_saliency_overlay(clean_rgb, abcd["lesion_mask"])
-
-    # 3. Tensor Normalization & PyTorch Forward Pass
-    pil_img = Image.fromarray(clean_rgb)
-    eval_transforms = transforms.Compose(
-        [
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-        ]
-    )
-    tensor = eval_transforms(pil_img).unsqueeze(0)
-
-    key = "vit" if "ViT" in model_choice else "efficientnet"
-    model, has_ckpt = get_model(model_choice)
-    with torch.no_grad():
-        logits = model(tensor)
-        raw_probs = F.softmax(logits, dim=1).squeeze(0).numpy()
-
-    if has_ckpt:
-        probs = raw_probs
-    else:
-        probs = compute_calibrated_probabilities(clean_bgr, abcd=abcd, model_key=key)
-
-    # 4. Format Output Dictionary for Gradio Label
-    confidences = {}
-    for idx, (name, prob) in enumerate(zip(CLASS_NAMES, probs)):
-        code = IDX_TO_LABEL[idx].upper()
-        confidences[f"{name} ({code})"] = float(prob)
-
-    abcd_md = (
-        f"### 🩺 Stolz ABCD Dermoscopic Biomarkers\n"
-        f"- **Hair Artifact Occlusion Removed**: `{occlusion_pct:.2f}%`\n"
-        f"- **A — Asymmetry Index**: `{abcd['asymmetry']:.1f}%`\n"
-        f"- **B — Border Irregularity**: `{abcd['border_irregularity']:.1f}%`\n"
-        f"- **C — Color Variegation**: `{abcd['color_zones']} / 6 clinical zones`\n"
-        f"- **D — Structure & Vascularity**: `{abcd['structure_score']:.1f}%`\n"
-        f"- **Total Dermoscopy Score (TDS)**: `{abcd['tds_score']:.2f}` — **{abcd['risk_tier']}**"
-    )
-
-    return clean_rgb, contour_rgb, saliency_rgb, confidences, abcd_md
-
-
-def launch() -> None:
+def resolve_weights() -> str:
+    """Path to the ViT-B/16 weights file (see module docstring for the order)."""
+    env = os.environ.get("MODEL_PATH")
+    if env:
+        return env
     try:
-        import gradio as gr
-    except ImportError:
-        print("Gradio is not installed. To run the web demo, install with:")
-        print("    pip install gradio")
-        return
+        from huggingface_hub import hf_hub_download
 
-    sample_dir = Path(__file__).parent / "data" / "samples"
-    examples = []
-    if sample_dir.exists():
-        preferred = [
-            "sample_nv.jpg",
-            "sample_mel.jpg",
-            "sample_bkl.jpg",
-            "sample_bcc.jpg",
-            "sample_akiec.jpg",
-            "sample_vasc.jpg",
-            "sample_df.jpg",
-        ]
-        for fname in preferred:
-            p = sample_dir / fname
-            if p.exists():
-                examples.append([str(p), "Vision Transformer (ViT-B/16)", 17, 10])
+        return hf_hub_download(repo_id=MODEL_REPO, filename=MODEL_FILENAME)
+    except Exception as exc:  # repo missing, offline, library absent
+        print(f"Hub download unavailable ({type(exc).__name__}); using local {VIT_CKPT}")
+        return VIT_CKPT
 
-    demo = gr.Interface(
-        fn=classify_lesion,
-        inputs=[
-            gr.Image(type="numpy", label="Upload Dermoscopic Image"),
-            gr.Radio(
-                choices=["Vision Transformer (ViT-B/16)", "EfficientNet-B3"],
-                value="Vision Transformer (ViT-B/16)",
-                label="Model Architecture",
-            ),
-            gr.Slider(minimum=5, maximum=25, step=2, value=17, label="Black-Hat Kernel Size (px)"),
-            gr.Slider(minimum=5, maximum=30, step=1, value=10, label="Hair Mask Threshold"),
-        ],
-        outputs=[
-            gr.Image(type="numpy", label="1. Preprocessed (Hair-Removed via TELEA)"),
-            gr.Image(type="numpy", label="2. Automated Lesion ROI Segmentation Contour"),
-            gr.Image(type="numpy", label="3. Explainable Grad-CAM / Attention Saliency"),
-            gr.Label(num_top_classes=7, label="4. HAM10000 7-Class Predictions"),
-            gr.Markdown(label="5. Clinical ABCD Biomarker Telemetry"),
-        ],
-        title="🔬 Tashkhees: Skin Lesion Classification — ViT-B/16 vs EfficientNet-B3",
-        description=(
-            "PyTorch deep-learning benchmark comparing CNN (EfficientNet-B3, 92.6% Acc) and "
-            "Vision Transformer (ViT-B/16, 94.2% Acc / 0.974 Macro AUC) for 7-class dermoscopic "
-            "classification on HAM10000. Includes Black-Hat hair removal, TELEA inpainting, "
-            "explainable saliency heatmaps, and Stolz ABCD telemetry."
-        ),
-        article=(
-            "### Disclaimer\n"
-            "This software is an engineering and research benchmark trained on the HAM10000 dataset. "
-            "It is intended solely for scientific evaluation and educational demonstration, "
-            "and must **not** be used as a medical diagnostic device."
-        ),
-        examples=examples if examples else None,
-    )
 
-    demo.launch()
+def resolve_ensemble_dir() -> str:
+    """Directory holding ``ensemble_config.json`` and the member weights."""
+    env = os.environ.get("ENSEMBLE_DIR")
+    if env:
+        return env
+    if (DEFAULT_DIR / "ensemble_config.json").is_file() and any(DEFAULT_DIR.glob("*.pt")):
+        return str(DEFAULT_DIR)
+    from huggingface_hub import hf_hub_download, list_repo_files
+
+    files = list_repo_files(ENSEMBLE_REPO)
+    local = [hf_hub_download(repo_id=ENSEMBLE_REPO, filename=f) for f in files if f.endswith((".pt", ".json"))]
+    return str(Path(local[0]).parent)
+
+
+def get_ensemble():
+    global _ENSEMBLE
+    if _ENSEMBLE is None:
+        _ENSEMBLE = load_ensemble(resolve_ensemble_dir())
+    return _ENSEMBLE
+
+
+def get_model():
+    global _MODEL
+    if _MODEL is None:
+        _MODEL = load_model(resolve_weights())
+    return _MODEL
+
+
+def classify(image: np.ndarray | None) -> dict[str, float]:
+    """Gradio callback: RGB array -> {"Class name (code)": probability} for all classes."""
+    if image is None:
+        raise ValueError("Please upload or select a dermoscopic image.")
+    probs = get_ensemble().predict_probs(image)
+    full = {f"{t['name']} ({t['code']})": t["prob"] for t in top_k(probs, k=len(probs))}
+    return full
+
+
+def build_demo():
+    import gradio as gr
+
+    examples = [str(SAMPLES_DIR / f"sample_{c}.jpg") for c in EXAMPLES]
+    examples = [p for p in examples if os.path.exists(p)]
+    with gr.Blocks(title="Skin Lesion Classifier (research demo)") as demo:
+        gr.Markdown("# Skin lesion classifier: ConvNeXt-S ensemble on HAM10000")
+        gr.Markdown(DISCLAIMER)
+        with gr.Row():
+            inp = gr.Image(type="numpy", label="Dermoscopic image", image_mode="RGB")
+            out = gr.Label(num_top_classes=3, label="Top-3 class probabilities")
+        btn = gr.Button("Classify", variant="primary")
+        btn.click(classify, inputs=inp, outputs=out)
+        if examples:
+            gr.Examples(
+                examples=examples, inputs=inp, outputs=out, fn=classify, cache_examples=False
+            )
+        gr.Markdown(
+            "Pipeline: hair removal (Black-Hat + TELEA) -> resize 384/448 -> ImageNet normalisation -> "
+            "4 ConvNeXt-S models with flip TTA -> log-prob average + class bias. Reported test results "
+            "(lesion-grouped split, 5-member ensemble): balanced accuracy 0.82, macro-F1 0.79, accuracy "
+            "0.84. This demo runs a 4-member subset whose own score was not measured."
+        )
+    return demo
 
 
 if __name__ == "__main__":
-    launch()
+    build_demo().launch(
+        server_name=os.environ.get("GRADIO_SERVER_NAME", "127.0.0.1"),
+        server_port=int(os.environ.get("GRADIO_SERVER_PORT", "7860")),
+    )

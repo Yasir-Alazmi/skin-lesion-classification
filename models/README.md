@@ -1,66 +1,30 @@
 # Models Directory
 
-Trained model checkpoints are **not committed directly to Git** due to their size (`.pth` files exceed GitHub's 100 MB limit).
+Trained checkpoints are **not committed to Git** (a ViT-B/16 checkpoint is about 344 MB).
 
----
+## Where the weights live
 
-## Live Interactive Demo (Zero-Install)
+- Training writes the best-by-validation-macro-F1 checkpoint to `best_vit_b16.pth` / `best_efficientnet_b3.pth`
+  (under `<SKIN_DATA_DIR>/checkpoints/` when that variable is set, otherwise `models/checkpoints/`).
+- The demo (`app.py`) loads ViT-B/16 weights from `MODEL_PATH`, else from the Hugging Face model repo
+  `Yasir-Alazmi/skin-lesion-vit-b16`, else from the local checkpoint above.
+- To publish weights: `python scripts/export_weights.py best_vit_b16.pth` and upload the output to that repo.
 
-You can test the full preprocessing, Stolz ABCD dermoscopic biomarker extraction, Grad-CAM / ViT patch attention maps, and 7-class HAM10000 inference live on **Hugging Face Spaces**:
+Test-set results for these checkpoints (lesion-grouped split) are in [`../results/metrics.md`](../results/metrics.md).
 
-> 🔬 **[Live Demo: Yasir-Alazmi/tashkhees-skin-lesion](https://huggingface.co/spaces/Yasir-Alazmi/tashkhees-skin-lesion)**
-
----
-
-## Checkpoint Filenames (`src/config.py`)
-
-When training locally via `python -m src.train`, checkpoints are saved automatically to `models/checkpoints/`:
-
-| File | Model | 30-Epoch Benchmark Acc / AUC | 15-Epoch Focal-Loss Test AUC |
-|------|-------|------------------------------|------------------------------|
-| `best_efficientnet_b3.pth` | EfficientNet-B3 | 92.6% / 0.95 | 0.9333 (`N=1,503`) |
-| `best_vit_b16.pth` | **ViT-B/16** | **94.2% / 0.96** | **0.9743 (`N=1,503`)** |
-
----
-
-## Checkpoint Format
-
-Each `.pth` checkpoint contains:
+## Checkpoint format
 
 ```python
-{
-    "epoch": int,                   # epoch at which checkpoint was saved
-    "model_state_dict": dict,       # model weights
-    "val_auc": float,               # validation macro AUC
-    "val_acc": float,               # validation accuracy
-}
+{"epoch": int, "model_state_dict": dict, "val_f1": float, ...}   # a bare state_dict also loads
 ```
 
-### Loading a Checkpoint
+### Loading
 
 ```python
-import torch
-from src.models import build_vit
-from src.config import DEVICE, VIT_CKPT
-
-model = build_vit(num_classes=7, pretrained=False)
-ckpt = torch.load(VIT_CKPT, map_location=DEVICE)
-model.load_state_dict(ckpt["model_state_dict"])
-model.eval()
-print(f"Loaded checkpoint from epoch {ckpt['epoch']} | Val AUC: {ckpt['val_auc']:.4f}")
+from src.inference import load_model
+model = load_model("best_vit_b16.pth")   # ViT-B/16, CPU, eval mode
 ```
 
----
+## Training
 
-## Training Your Own Checkpoints
-
-```bash
-# Dry-run verification (no dataset required)
-python -m src.train --model vit --dry-run
-
-# Train EfficientNet-B3 — saves to models/checkpoints/best_efficientnet_b3.pth
-python -m src.train --model efficientnet
-
-# Train ViT-B/16 — saves to models/checkpoints/best_vit_b16.pth
-python -m src.train --model vit --epochs 30 --batch-size 16 --lr 1e-4
-```
+See "Reproduce" in the [README](../README.md): `scripts/train_all.ps1` trains both models on the committed split.
