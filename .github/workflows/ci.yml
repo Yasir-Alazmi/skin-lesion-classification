@@ -71,6 +71,7 @@ jobs:
           pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cpu
           pip install timm==0.9.12 "numpy<2" pandas scikit-learn opencv-python-headless Pillow matplotlib seaborn tqdm
           pip install pytest
+          pip install onnx onnxruntime fastapi httpx python-multipart
           pip install --no-deps -e .
 
       - name: Run tests

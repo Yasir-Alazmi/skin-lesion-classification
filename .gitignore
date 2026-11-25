@@ -74,3 +74,6 @@ lightning_logs/
 
 # Ensemble weights (hundreds of MB); the config JSON is tracked
 models/ensemble/*.pt
+
+# ONNX exports (large, produced by scripts/export_onnx.py)
+*.onnx
