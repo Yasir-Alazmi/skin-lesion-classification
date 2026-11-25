@@ -1,0 +1,51 @@
+{
+  "date": "2026-11-25",
+  "what": "ONNX export of the 4-member ConvNeXt-S ensemble; parity vs PyTorch on data/samples (not the test set)",
+  "opset": 17,
+  "members": [
+    {
+      "member": "cnx384_s42.pt",
+      "onnx": "cnx384_s42.onnx",
+      "size": 384,
+      "onnx_mb": 188.8
+    },
+    {
+      "member": "cnx384_s7.pt",
+      "onnx": "cnx384_s7.onnx",
+      "size": 384,
+      "onnx_mb": 188.8
+    },
+    {
+      "member": "cnx448_s42.pt",
+      "onnx": "cnx448_s42.onnx",
+      "size": 448,
+      "onnx_mb": 188.8
+    },
+    {
+      "member": "cnx448_s7.pt",
+      "onnx": "cnx448_s7.onnx",
+      "size": 448,
+      "onnx_mb": 188.8
+    }
+  ],
+  "parity": {
+    "images": 9,
+    "max_abs_prob_diff": 1.2383534151449993e-06,
+    "mean_max_abs_prob_diff": 3.8851096589275397e-07,
+    "top1_agreement": "9/9"
+  },
+  "cpu_latency_ms_per_image": {
+    "note": "full request: 4 members x 4 flip views, incl. hair removal; first call excluded as warm-up",
+    "pytorch_median": 4145.2,
+    "onnxruntime_median": 3680.3,
+    "pytorch_mean": 4206.0,
+    "onnxruntime_mean": 3661.4
+  },
+  "environment": {
+    "cpu": "Intel64 Family 6 Model 165 Stepping 3, GenuineIntel",
+    "python": "3.12.9",
+    "torch": "2.6.0+cu124",
+    "onnxruntime": "1.32.0",
+    "threads": "default"
+  }
+}

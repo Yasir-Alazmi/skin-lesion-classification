@@ -117,6 +117,27 @@ Ensemble weights: `ENSEMBLE_DIR` if set, otherwise `models/ensemble/`, otherwise
 
 The front-matter at the top of this README configures a `sdk: gradio` Space. To deploy: (1) upload the four `models/ensemble/*.pt` files and `ensemble_config.json` to a model repo `Yasir-Alazmi/skin-lesion-convnext-ensemble` (the older ViT-B/16 export is `scripts/export_weights.py`); (2) create a Gradio Space and push this repository's files (`app.py`, `src/`, `data/samples/`, `requirements.txt`, `README.md`); the app downloads the weights on first start.
 
+## Serving with ONNX Runtime
+
+`scripts/export_onnx.py` exports the four ensemble members to ONNX (opset 17). The `serving/` package runs them with ONNX Runtime behind a FastAPI app, and it does not need PyTorch:
+
+```bash
+python scripts/export_onnx.py --model-dir models/ensemble   # writes models/ensemble/*.onnx and results/onnx_export.json
+MODEL_DIR=models/ensemble uvicorn serving.app:app --port 8080
+curl -F file=@data/samples/sample_mel.jpg http://127.0.0.1:8080/predict
+```
+
+The endpoints are `GET /health`, `GET /info` and `POST /predict`. The ONNX ensemble applies the same preprocessing, flip TTA and bias rule as the PyTorch code.
+
+From [`results/onnx_export.json`](results/onnx_export.json), measured on 2026-11-25 on a laptop CPU:
+
+| Check | Result |
+|---|---|
+| Parity with PyTorch on the 9 demo images in `data/samples` | max absolute probability difference 1.2e-06; top-1 agreement 9/9 |
+| CPU latency per image (4 members x 4 flip views, including hair removal) | ONNX Runtime median 3.68 s; PyTorch median 4.15 s |
+
+Parity was checked on the demo images only, not on the test set, which is not re-used. The served model is the 4-member ensemble. Its own test score was never measured, because the reported 0.819 belongs to the 5-member ensemble (see [Limitations](#limitations)). `tests/test_serving.py` checks the preprocessing, the TTA views, the combination rule and the API against the PyTorch code, using small stand-in models.
+
 ## Reproduce
 
 ```bash
