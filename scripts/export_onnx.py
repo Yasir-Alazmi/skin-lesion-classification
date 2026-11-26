@@ -14,6 +14,7 @@ is not re-used (see README). The script runs on CPU only.
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import platform
 import statistics
@@ -34,16 +35,32 @@ from src.preprocess import read_image_bgr  # noqa: E402
 OPSET = 17
 
 
+def export_kwargs() -> dict:
+    """Extra ``torch.onnx.export`` arguments supported by the installed torch.
+
+    Newer torch versions accept ``dynamo=`` and may default to the dynamo exporter; we pin the
+    TorchScript exporter there. torch 2.1 (pinned in pyproject and CI) has no such argument.
+    """
+    if "dynamo" in inspect.signature(torch.onnx.export).parameters:
+        return {"dynamo": False}
+    return {}
+
+
+def export_model(model: torch.nn.Module, size: int, path: Path) -> None:
+    """Export one classifier taking ``(N, 3, size, size)`` images to ONNX at ``path``."""
+    dummy = torch.randn(1, 3, size, size)
+    torch.onnx.export(model, dummy, str(path), opset_version=OPSET, input_names=["image"],
+                      output_names=["logits"], dynamic_axes={"image": {0: "batch"}, "logits": {0: "batch"}},
+                      **export_kwargs())
+
+
 def export_members(model_dir: Path) -> list[dict]:
     cfg = json.loads((model_dir / "ensemble_config.json").read_text(encoding="utf-8"))
     ens = load_ensemble(model_dir, device="cpu")
     out = []
     for (model, size), m in zip(ens.members, cfg["members"]):
         path = model_dir / onnx_name(m["file"])
-        dummy = torch.randn(1, 3, size, size)
-        torch.onnx.export(model, dummy, str(path), opset_version=OPSET, input_names=["image"],
-                          output_names=["logits"], dynamic_axes={"image": {0: "batch"}, "logits": {0: "batch"}},
-                          dynamo=False)
+        export_model(model, size, path)
         out.append({"member": m["file"], "onnx": path.name, "size": size,
                     "onnx_mb": round(path.stat().st_size / 2**20, 1)})
         print(f"exported {path.name} ({out[-1]['onnx_mb']} MB)")

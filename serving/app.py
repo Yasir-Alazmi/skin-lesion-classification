@@ -55,9 +55,11 @@ def create_app(model: OnnxEnsemble | None = None, model_dir: str | Path | None =
         return {"classes": list(CLASS_NAMES), "members": len(m.sessions), "input_sizes": m.sizes,
                 "tta_views": 4, "description": m.description, "disclaimer": DISCLAIMER}
 
+    # A plain ``def`` endpoint: FastAPI runs it in a worker thread, so the blocking ONNX inference
+    # does not stall the event loop.
     @app.post("/predict")
-    async def predict(file: UploadFile = File(...)) -> dict:
-        data = await file.read()
+    def predict(file: UploadFile = File(...)) -> dict:
+        data = file.file.read(MAX_BYTES + 1)  # never hold more than the limit plus one byte
         if len(data) > MAX_BYTES:
             raise HTTPException(status_code=413, detail="image larger than 10 MB")
         try:

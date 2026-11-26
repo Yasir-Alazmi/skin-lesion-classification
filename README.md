@@ -136,7 +136,7 @@ From [`results/onnx_export.json`](results/onnx_export.json), measured on 2026-11
 
 | Check | Result |
 |---|---|
-| Parity with PyTorch on the 9 demo images in `data/samples` | max absolute probability difference 1.2e-06; top-1 agreement 9/9 |
+| Parity with PyTorch on the 9 files then in `data/samples` (7 unique images; 2 files were byte-identical duplicates, since removed) | max absolute probability difference 1.2e-06; top-1 agreement 9/9 |
 | CPU latency per image (4 members x 4 flip views, including hair removal) | ONNX Runtime median 3.68 s; PyTorch median 4.15 s |
 
 Parity was checked on the demo images only, not on the test set, which is not re-used. The served model is the 4-member ensemble. Its own test score was never measured, because the reported 0.819 belongs to the 5-member ensemble (see [Limitations](#limitations)). `tests/test_serving.py` checks the preprocessing, the TTA views, the combination rule and the API against the PyTorch code, using small stand-in models.

@@ -545,15 +545,18 @@ def show_predictions(
     return fig
 
 
-def generate_saliency_overlay(
+def generate_edge_overlay(
     clean_rgb: np.ndarray,
     lesion_mask: np.ndarray | None = None,
     alpha: float = 0.45,
 ) -> np.ndarray:
     """
-    Generate an explainable Grad-CAM / Patch Attention saliency heatmap
-    overlay (RGB uint8) highlighting high-contrast dermoscopic structures
-    within the segmented lesion ROI.
+    Edge-magnitude overlay, not a model explanation.
+
+    Returns a 224x224 RGB uint8 image with a heatmap of inverted brightness
+    and Sobel edge magnitude, optionally weighted by ``lesion_mask``. It is
+    computed from the pixels alone: no model is used, so it says nothing
+    about what a classifier looked at.
     """
     import cv2
 
@@ -566,15 +569,15 @@ def generate_saliency_overlay(
     gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
     grad = np.hypot(gx, gy)
 
-    saliency = 0.65 * inv_luma + 0.35 * grad
+    energy = 0.65 * inv_luma + 0.35 * grad
     if lesion_mask is not None:
         mask_224 = cv2.resize(lesion_mask, (224, 224)).astype(np.float32) / 255.0
         mask_smooth = cv2.GaussianBlur(mask_224, (31, 31), 0)
-        saliency = saliency * (0.25 + 0.75 * mask_smooth)
+        energy = energy * (0.25 + 0.75 * mask_smooth)
 
-    saliency = cv2.GaussianBlur(saliency, (25, 25), 0)
-    s_min, s_max = float(saliency.min()), float(saliency.max())
-    norm = (saliency - s_min) / max(1e-5, s_max - s_min)
+    energy = cv2.GaussianBlur(energy, (25, 25), 0)
+    s_min, s_max = float(energy.min()), float(energy.max())
+    norm = (energy - s_min) / max(1e-5, s_max - s_min)
     heatmap_u8 = np.uint8(255.0 * norm)
 
     heatmap_bgr = cv2.applyColorMap(heatmap_u8, cv2.COLORMAP_JET)
@@ -582,3 +585,7 @@ def generate_saliency_overlay(
 
     blended = cv2.addWeighted(resized, 1.0 - alpha, heatmap_rgb, alpha, 0)
     return blended
+
+
+# Backwards-compatible alias for the old, misleading name.
+generate_saliency_overlay = generate_edge_overlay

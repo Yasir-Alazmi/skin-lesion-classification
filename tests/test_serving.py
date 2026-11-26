@@ -16,7 +16,7 @@ pytest.importorskip("fastapi")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from serving.app import create_app  # noqa: E402
+from serving.app import MAX_BYTES, create_app  # noqa: E402
 from serving.model import combine_log_probs, load_onnx_ensemble, onnx_name  # noqa: E402
 from serving.preprocess import CLASS_NAMES, preprocess, tta_views  # noqa: E402
 from src import ensemble as torch_ens  # noqa: E402
@@ -110,6 +110,43 @@ def test_api_rejects_non_image(model_dir):
     client = TestClient(create_app(model=load_onnx_ensemble(model_dir)))
     r = client.post("/predict", files={"file": ("x.txt", b"not an image", "text/plain")})
     assert r.status_code == 400
+
+
+def test_api_rejects_oversize_upload(model_dir):
+    client = TestClient(create_app(model=load_onnx_ensemble(model_dir)))
+    r = client.post("/predict", files={"file": ("big.jpg", b"x" * (MAX_BYTES + 1), "image/jpeg")})
+    assert r.status_code == 413
+
+
+def test_api_accepts_upload_at_the_limit_boundary(model_dir):
+    # Exactly MAX_BYTES is not rejected for size (it fails decoding instead, as it is not an image).
+    client = TestClient(create_app(model=load_onnx_ensemble(model_dir)))
+    r = client.post("/predict", files={"file": ("edge.jpg", b"x" * MAX_BYTES, "image/jpeg")})
+    assert r.status_code == 400
+
+
+def test_export_script_runs_on_installed_torch(tmp_path):
+    """scripts/export_onnx.py must work on the pinned torch (2.1 has no ``dynamo`` argument)."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("export_onnx", ROOT / "scripts" / "export_onnx.py")
+    export_onnx = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(export_onnx)
+
+    import inspect
+
+    has_dynamo = "dynamo" in inspect.signature(torch.onnx.export).parameters
+    assert export_onnx.export_kwargs() == ({"dynamo": False} if has_dynamo else {})
+
+    import onnxruntime as ort
+
+    net = Tiny(seed=3).eval()
+    path = tmp_path / "tiny.onnx"
+    export_onnx.export_model(net, 32, path)
+    x = np.random.default_rng(0).standard_normal((2, 3, 32, 32)).astype(np.float32)
+    out = ort.InferenceSession(str(path), providers=["CPUExecutionProvider"]).run(None, {"image": x})[0]
+    with torch.no_grad():
+        np.testing.assert_allclose(out, net(torch.from_numpy(x)).numpy(), atol=1e-5)
 
 
 def test_health_reports_missing_model(tmp_path):

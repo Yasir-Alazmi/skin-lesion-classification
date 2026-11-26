@@ -1,4 +1,4 @@
-"""Comprehensive unit tests for preprocessing, ABCD biomarkers, and saliency."""
+"""Unit tests for preprocessing, ABCD features and the edge overlay."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from src.preprocess import (  # noqa: E402
     remove_hair_with_mask,
 )
 from src.train import EarlyStopping  # noqa: E402
-from src.visualize import generate_saliency_overlay  # noqa: E402
+from src.visualize import generate_edge_overlay, generate_saliency_overlay  # noqa: E402
 
 
 def test_all_seven_ham10000_samples_exist_and_readable():
@@ -55,11 +55,12 @@ def test_remove_hair_with_mask_and_abcd():
     assert abcd["tds_score"] > 0.0
 
 
-def test_saliency_overlay():
-    """Saliency heatmap must return a valid 224x224 RGB array."""
+def test_edge_overlay():
+    """The edge-magnitude overlay returns a 224x224 RGB array; the old name is an alias."""
     sample_path = repo_root / "data" / "samples" / "sample_nv.jpg"
     img_rgb = read_image_bgr(sample_path)[:, :, ::-1].copy()
-    assert generate_saliency_overlay(img_rgb).shape == (224, 224, 3)
+    assert generate_edge_overlay(img_rgb).shape == (224, 224, 3)
+    assert generate_saliency_overlay is generate_edge_overlay
 
 
 def test_early_stopping_behavior():
