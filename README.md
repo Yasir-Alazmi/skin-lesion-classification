@@ -1,26 +1,30 @@
----
-title: Skin Lesion Classifier (research demo)
-emoji: 🔬
-colorFrom: blue
-colorTo: indigo
-sdk: gradio
-sdk_version: 6.31.0
-python_version: "3.10"
-app_file: app.py
-pinned: false
-license: mit
-short_description: ConvNeXt-S ensemble on HAM10000, lesion-grouped evaluation. Research demo.
----
+# Skin Lesion Classification (HAM10000)
 
-# Skin Lesion Classification on HAM10000: ConvNeXt-S ensemble vs ViT-B/16 and EfficientNet-B3
+7-class dermoscopy classifier evaluated on a **lesion-grouped** split (no lesion in both train and test).
+Balanced accuracy **0.819** [95% CI 0.783–0.852] for a 5-model ConvNeXt-S ensemble vs **0.712** for a ViT-B/16 baseline, on 1,503 held-out images.
+Melanoma sensitivity 0.72: about 1 in 4 is still missed.
 
-7-class dermoscopic image classification, evaluated with a **lesion-grouped split** so that no lesion appears in both training and test data. Includes a Gradio demo that runs the real trained models.
+![Ensemble vs baseline](results/ensemble_vs_baseline.png)
+
+*Held-out test set, 1,503 images, lesion-grouped; 95% bootstrap CIs. Built from [`results/final_r2_metrics.json`](results/final_r2_metrics.json) by `scripts/plot_ensemble_vs_baseline.py`.*
 
 > **Research project, not a medical device.** Not clinically validated. See [Limitations](#limitations).
 
 [![CI](https://github.com/Yasir-Alazmi/skin-lesion-classification/actions/workflows/ci.yml/badge.svg)](https://github.com/Yasir-Alazmi/skin-lesion-classification/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+## Run the API
+
+```bash
+pip install -r requirements.txt -r serving/requirements.txt onnx
+huggingface-cli download Yasir-Alazmi/skin-lesion-convnext-ensemble --local-dir models/ensemble
+python scripts/export_onnx.py --model-dir models/ensemble    # ONNX files must be exported first
+MODEL_DIR=models/ensemble uvicorn serving.app:app --port 8080
+curl -F file=@data/samples/sample_mel.jpg http://127.0.0.1:8080/predict
+```
+
+This serves the **4-member** ensemble with ONNX Runtime (about 3.7 s per image on a laptop CPU, see [ONNX serving](#serving-with-onnx-runtime)). Its test score was not measured; the 0.819 above is the 5-member ensemble. Endpoints: `GET /health`, `GET /info`, `POST /predict`. On Windows PowerShell set the variable with `$env:MODEL_DIR="models/ensemble"` first.
 
 ## Results
 
@@ -36,7 +40,7 @@ Five ConvNeXt-S models (ImageNet-22k pre-training, 384 and 448 px, two seeds, fl
 | Same ensemble, no bias | 0.850 | 0.780 | 0.770 | 0.971 | 0.649 |
 | ViT-B/16 (v2.0 baseline) | 0.806 | 0.710 | 0.712 | 0.955 | 0.673 |
 
-Paired bootstrap difference to the baseline: balanced accuracy +0.063 to +0.153, macro-F1 +0.034 to +0.123 (95% intervals, both exclude 0). Numbers: [`results/final_r2_metrics.json`](results/final_r2_metrics.json).
+Paired bootstrap difference to the baseline: balanced accuracy +0.063 to +0.153, macro-F1 +0.034 to +0.123 (95% intervals, both exclude 0). Numbers: [`results/final_r2_metrics.json`](results/final_r2_metrics.json). The ensemble's per-image test predictions are not committed; only these aggregate metrics are.
 
 Read these numbers with care:
 - **The bias is a trade-off, not free accuracy.** It shifts predictions towards rare classes: balanced accuracy rises from 0.770 to 0.819 while plain accuracy falls from 0.850 to 0.837 (nevus sensitivity 0.88). Its effect was checked by lesion-disjoint cross-fitting inside the validation set (balanced accuracy 0.716 to 0.763 on the held-out half).
@@ -106,16 +110,15 @@ Validation-only results of the two sweeps ([`kaggle/r1`](kaggle/r1/train.py), [`
 
 ```bash
 pip install -r requirements.txt
-export MODEL_PATH=/path/to/best_vit_b16.pth   # optional (Windows: set MODEL_PATH=...)
 python app.py                                  # http://127.0.0.1:7860
 python demo.py --image data/samples/sample_mel.jpg   # command-line version
 ```
 
-Ensemble weights: `ENSEMBLE_DIR` if set, otherwise `models/ensemble/`, otherwise downloaded from the Hugging Face model repo `Yasir-Alazmi/skin-lesion-convnext-ensemble` (`ENSEMBLE_REPO` overrides). Legacy single-model weights: `MODEL_PATH`, or the repo `Yasir-Alazmi/skin-lesion-vit-b16`. Checkpoints are not stored in git.
+Ensemble weights: `ENSEMBLE_DIR` if set, otherwise `models/ensemble/`, otherwise downloaded from the Hugging Face model repo [`Yasir-Alazmi/skin-lesion-convnext-ensemble`](https://huggingface.co/Yasir-Alazmi/skin-lesion-convnext-ensemble) (`ENSEMBLE_REPO` overrides). That repo holds the **4-member** version; the reported 0.819 is the 5-member ensemble. The v2.0 ViT-B/16 weights are not published; `demo.py --weights` takes a local checkpoint. Checkpoints are not stored in git.
 
 ### Hugging Face Space
 
-The front-matter at the top of this README configures a `sdk: gradio` Space. To deploy: (1) upload the four `models/ensemble/*.pt` files and `ensemble_config.json` to a model repo `Yasir-Alazmi/skin-lesion-convnext-ensemble` (the older ViT-B/16 export is `scripts/export_weights.py`); (2) create a Gradio Space and push this repository's files (`app.py`, `src/`, `data/samples/`, `requirements.txt`, `README.md`); the app downloads the weights on first start.
+Not deployed. To deploy one, create a Gradio Space with its own README front-matter (`sdk: gradio`, `app_file: app.py`) and push `app.py`, `src/`, `data/samples/` and `requirements.txt`; the app downloads the ensemble weights from the model repo above on first start.
 
 ## Serving with ONNX Runtime
 
@@ -166,8 +169,10 @@ Training uses focal loss (gamma 2), AdamW (lr 1e-4), a frozen backbone for the f
 
 ```
 app.py, demo.py        Gradio demo and CLI (real model inference)
-src/                   config, split, dataset, preprocess, models, loss, train, evaluate, visualize, inference
-scripts/               train_all.ps1, train_status.ps1, report.py, export_weights.py, final_eval_r2.py
+src/                   config, split, dataset, preprocess, models, loss, train, evaluate, visualize, inference, ensemble
+serving/               ONNX Runtime + FastAPI server (GET /health, /info, POST /predict)
+scripts/               train_all.ps1, train_status.ps1, report.py, export_weights.py, final_eval_r2.py,
+                       export_onnx.py, plot_ensemble_vs_baseline.py
 kaggle/                r1, r2: Kaggle training scripts for the ConvNeXt sweeps (2 x T4)
 models/ensemble/       ensemble_config.json (tracked); member weights (.pt, ignored)
 results/               splits.csv, test predictions, metrics.{json,md}, figures

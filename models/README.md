@@ -6,9 +6,11 @@ Trained checkpoints are **not committed to Git** (a ViT-B/16 checkpoint is about
 
 - Training writes the best-by-validation-macro-F1 checkpoint to `best_vit_b16.pth` / `best_efficientnet_b3.pth`
   (under `<SKIN_DATA_DIR>/checkpoints/` when that variable is set, otherwise `models/checkpoints/`).
-- The demo (`app.py`) loads ViT-B/16 weights from `MODEL_PATH`, else from the Hugging Face model repo
-  `Yasir-Alazmi/skin-lesion-vit-b16`, else from the local checkpoint above.
-- To publish weights: `python scripts/export_weights.py best_vit_b16.pth` and upload the output to that repo.
+- The single-model path (`demo.py --weights`, `app.resolve_weights`) loads ViT-B/16 weights from `MODEL_PATH`,
+  else from the local checkpoint above. The ViT-B/16 weights are not published.
+- The Gradio demo (`app.py`) and the ONNX server (`serving/`) use the 4-member ConvNeXt-S ensemble in `ensemble/`,
+  downloadable from the Hugging Face model repo `Yasir-Alazmi/skin-lesion-convnext-ensemble`. The reported 0.819
+  balanced accuracy belongs to the 5-member ensemble; the 4-member version was not scored on the test set.
 
 Test-set results for these checkpoints (lesion-grouped split) are in [`../results/metrics.md`](../results/metrics.md).
 

@@ -11,7 +11,7 @@ Ensemble weights resolution (first that works):
   3. Hugging Face Hub: ``ENSEMBLE_REPO`` (default ``Yasir-Alazmi/skin-lesion-convnext-ensemble``).
 The older single ViT-B/16 path (``resolve_weights``, used by ``demo.py --weights``) is kept.
 
-Run locally:  python app.py        Deploy: see "Hugging Face Space" in README.md.
+Run locally:  python app.py        Deploy: see "Hugging Face Space" in README.md (not deployed).
 RESEARCH DEMO ONLY -- not a medical device, not clinically validated.
 """
 
@@ -29,8 +29,6 @@ from src.config import VIT_CKPT  # noqa: E402
 from src.ensemble import DEFAULT_DIR, load_ensemble  # noqa: E402
 from src.inference import load_model, predict_probs, top_k  # noqa: E402
 
-MODEL_REPO = os.environ.get("MODEL_REPO", "Yasir-Alazmi/skin-lesion-vit-b16")
-MODEL_FILENAME = os.environ.get("MODEL_FILENAME", "best_vit_b16.pth")
 ENSEMBLE_REPO = os.environ.get("ENSEMBLE_REPO", "Yasir-Alazmi/skin-lesion-convnext-ensemble")
 SAMPLES_DIR = Path(__file__).parent / "data" / "samples"
 EXAMPLES = ["nv", "mel", "bkl", "bcc", "akiec", "vasc", "df"]
@@ -47,17 +45,11 @@ _ENSEMBLE = None
 
 
 def resolve_weights() -> str:
-    """Path to the ViT-B/16 weights file (see module docstring for the order)."""
-    env = os.environ.get("MODEL_PATH")
-    if env:
-        return env
-    try:
-        from huggingface_hub import hf_hub_download
+    """Path to the ViT-B/16 weights file: ``MODEL_PATH`` if set, else the local checkpoint.
 
-        return hf_hub_download(repo_id=MODEL_REPO, filename=MODEL_FILENAME)
-    except Exception as exc:  # repo missing, offline, library absent
-        print(f"Hub download unavailable ({type(exc).__name__}); using local {VIT_CKPT}")
-        return VIT_CKPT
+    The v2.0 ViT-B/16 weights are not published on the Hugging Face Hub.
+    """
+    return os.environ.get("MODEL_PATH") or VIT_CKPT
 
 
 def resolve_ensemble_dir() -> str:
